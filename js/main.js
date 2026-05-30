@@ -111,6 +111,33 @@
     sections.forEach(function (s) { navObs.observe(s); });
   }
 
+  /* --- Contact form (no backend: compose a pre-filled email) --- */
+  var form = document.querySelector("[data-contact-form]");
+  if (form) {
+    var note = form.querySelector("[data-form-note]");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+      var get = function (n) { var el = form.elements[n]; return el ? el.value.trim() : ""; };
+      var name = get("name"), email = get("email"), company = get("company"), message = get("message");
+      var subject = "Website enquiry" + (name ? " from " + name : "");
+      var bodyLines = [
+        "Name: " + name,
+        "Email: " + email,
+        company ? "Company: " + company : null,
+        "",
+        message
+      ].filter(function (l) { return l !== null; });
+      var href = "mailto:hello@techjam.ltd?subject=" + encodeURIComponent(subject) +
+                 "&body=" + encodeURIComponent(bodyLines.join("\n"));
+      window.location.href = href;
+      if (note) note.textContent = "Opening your email app… if nothing happens, email us directly at hello@techjam.ltd.";
+    });
+  }
+
   /* --- Footer year --- */
   var yearEl = document.querySelector("[data-year]");
   if (yearEl) yearEl.textContent = String(new Date().getFullYear());

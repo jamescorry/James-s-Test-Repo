@@ -30,8 +30,10 @@ robots.txt
 - **Logo:** replace `assets/logo.png` (an SVG is ideal). See `assets/README.md`.
 - **Content:** all copy lives in `index.html`. Items marked *illustrative* (stats, case
   studies, testimonials) are placeholders — swap in real numbers and client stories.
-- **Contact:** email is `hello@techjam.ltd`; phone is a `[ +44 phone ]` placeholder in the
-  hero CTA and footer.
+- **Contact:** email is `hello@techjam.ltd`. The contact form has no backend — on submit
+  it composes a pre-filled email to that address. To enable true server-side submission,
+  point the form's `action` at a Formspree / Azure Function / Power Automate endpoint and
+  set `method="post"` (see the comment above the form in `index.html`).
 
 ## Features
 Animated gradient hero · glassmorphism cards · scroll-reveal & count-up animations ·

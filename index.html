@@ -415,18 +415,59 @@
       </div>
     </section>
 
-    <!-- ============================= FINAL CTA ============================= -->
+    <!-- ============================== CONTACT ============================= -->
     <section class="cta" id="contact" aria-labelledby="cta-title">
       <div class="cta__bg" aria-hidden="true"><span class="orb orb--1"></span><span class="orb orb--2"></span></div>
-      <div class="container cta__inner" data-reveal>
-        <p class="eyebrow eyebrow--bracket eyebrow--light">Let's talk</p>
-        <h2 class="cta__title" id="cta-title">Let's build something that works.</h2>
-        <p class="cta__lead">Tell us where you're stuck. We'll show you what's possible with Microsoft Dynamics 365, Power Platform and Azure.</p>
-        <div class="cta__actions">
-          <a class="btn btn-on-dark btn-lg" href="mailto:hello@techjam.ltd?subject=Discovery%20call%20enquiry">Start the conversation</a>
-          <a class="btn btn-ghost-light btn-lg" href="https://www.linkedin.com/company/tech-jam" target="_blank" rel="noopener">Connect on LinkedIn</a>
+      <div class="container contact">
+        <div class="contact__intro" data-reveal>
+          <p class="eyebrow eyebrow--bracket eyebrow--light">Let's talk</p>
+          <h2 class="cta__title" id="cta-title">Let's build something that works.</h2>
+          <p class="cta__lead">Tell us where you're stuck. We'll show you what's possible with Microsoft Dynamics 365, Power Platform and Azure — usually within one working day.</p>
+          <ul class="contact__links">
+            <li>
+              <span class="contact__ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4 7l8 6 8-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </span>
+              <a href="mailto:hello@techjam.ltd">hello@techjam.ltd</a>
+            </li>
+            <li>
+              <span class="contact__ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.35V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.07 2.07 0 1 1 0-4.14 2.07 2.07 0 0 1 0 4.14zM7.12 20.45H3.55V9h3.57v11.45z"/></svg>
+              </span>
+              <a href="https://www.linkedin.com/company/tech-jam" target="_blank" rel="noopener">Connect on LinkedIn</a>
+            </li>
+            <li>
+              <span class="contact__ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="10" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+              </span>
+              <span>Derby, England, UK</span>
+            </li>
+          </ul>
         </div>
-        <p class="cta__contact"><a href="mailto:hello@techjam.ltd">hello@techjam.ltd</a> <span aria-hidden="true">·</span> <a href="tel:+44">[ +44 phone ]</a></p>
+
+        <!-- No-backend form: JS composes a pre-filled email to hello@techjam.ltd.
+             To enable true server-side submission, set the form `action` to a
+             Formspree / Azure Function / Power Automate endpoint and `method="post"`. -->
+        <form class="contact__form" data-contact-form novalidate data-reveal data-reveal-delay="1">
+          <div class="field">
+            <label for="cf-name">Name</label>
+            <input id="cf-name" name="name" type="text" autocomplete="name" required />
+          </div>
+          <div class="field">
+            <label for="cf-email">Email</label>
+            <input id="cf-email" name="email" type="email" autocomplete="email" required />
+          </div>
+          <div class="field">
+            <label for="cf-company">Company <span class="opt">(optional)</span></label>
+            <input id="cf-company" name="company" type="text" autocomplete="organization" />
+          </div>
+          <div class="field">
+            <label for="cf-message">How can we help?</label>
+            <textarea id="cf-message" name="message" rows="4" required></textarea>
+          </div>
+          <button class="btn btn-on-dark btn-lg contact__submit" type="submit">Send message</button>
+          <p class="contact__note" data-form-note role="status" aria-live="polite"></p>
+        </form>
       </div>
     </section>
 
