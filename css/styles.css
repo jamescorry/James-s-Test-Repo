@@ -61,6 +61,18 @@ ul, ol { list-style: none; padding: 0; }
 .eyebrow--bracket::after  { content: " >>"; opacity: .55; }
 .eyebrow--light { color: var(--brand-pink); }
 
+/* Readable eyebrow on the dark / gradient sections — brighten + black outline */
+.hero .eyebrow,
+.cta .eyebrow {
+  color: var(--brand-pink);
+  text-shadow:
+    0 1px 3px rgba(0,0,0,.6),
+    -1px -1px 0 rgba(0,0,0,.55),  1px -1px 0 rgba(0,0,0,.55),
+    -1px  1px 0 rgba(0,0,0,.55),  1px  1px 0 rgba(0,0,0,.55);
+}
+.hero .eyebrow--bracket::before, .hero .eyebrow--bracket::after,
+.cta .eyebrow--bracket::before,  .cta .eyebrow--bracket::after { opacity: .8; }
+
 .grad-text {
   background: var(--grad-text);
   -webkit-background-clip: text; background-clip: text; color: transparent;
@@ -348,6 +360,16 @@ ul, ol { list-style: none; padding: 0; }
     transform: translateX(100%); transition: transform .35s var(--ease); box-shadow: -20px 0 60px rgba(0,0,0,.4);
   }
   .nav__links.is-open { transform: translateX(0); }
+  /* While the menu is open, drop the frosted backdrop-filter on the header:
+     it would otherwise become the containing block for the fixed drawer and
+     collapse it to the header's height (white links spilling onto the page). */
+  .site-header.nav-open,
+  .site-header.nav-open.is-scrolled {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+  }
   .nav__links a { color: var(--dark-text); font-size: 1.15rem; padding: .7rem .9rem; }
   .nav__links a:hover { background: rgba(255,255,255,.08); }
   .nav__toggle { display: block; z-index: 110; }

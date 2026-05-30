@@ -3,7 +3,6 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - claude/techjam-website-redesign-7xwYa
       - master
   workflow_dispatch:
 
