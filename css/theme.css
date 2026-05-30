@@ -1,0 +1,79 @@
+/* ==========================================================================
+   TechJam — Design Tokens
+   --------------------------------------------------------------------------
+   This is the ONLY place brand colours live. To match TechJam's exact brand,
+   edit the --brand-* values below (and drop the real logo at assets/logo.png).
+   styles.css never hard-codes a colour — everything reads from these tokens.
+   ========================================================================== */
+
+:root {
+  /* ---- Brand: purple -> magenta (from the TechJam logo). SWAP HERE. ---- */
+  --brand-deep:    #4a1273;   /* deepest violet */
+  --brand-900:     #5b1a8b;
+  --brand-800:     #701fa6;
+  --brand:         #8e1fc0;   /* core purple */
+  --brand-bright:  #b026e3;   /* vivid purple */
+  --brand-magenta: #d500f9;   /* magenta accent */
+  --brand-pink:    #e94fe0;   /* pink highlight */
+  --brand-soft:    #f3e9fb;   /* pale tint for light surfaces */
+
+  /* ---- Signature gradients ---- */
+  --grad-brand:  linear-gradient(120deg, var(--brand-deep), var(--brand) 45%, var(--brand-magenta) 100%);
+  --grad-vivid:  linear-gradient(120deg, var(--brand-bright), var(--brand-magenta) 55%, var(--brand-pink));
+  --grad-text:   linear-gradient(100deg, var(--brand-bright), var(--brand-magenta) 60%, var(--brand-pink));
+  --grad-hero:   linear-gradient(135deg, #2a0a45 0%, var(--brand-deep) 35%, var(--brand-800) 65%, var(--brand-magenta) 130%);
+  --glass:       linear-gradient(135deg, rgba(255,255,255,.65), rgba(255,255,255,.30));
+  --glass-dark:  linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,255,255,.02));
+
+  /* ---- Neutrals / surfaces (light base) ---- */
+  --ink:         #190a28;   /* near-black aubergine — body text */
+  --ink-soft:    #4b3b5e;   /* muted text */
+  --ink-faint:   #8d7fa0;   /* faint text */
+  --bg:          #ffffff;
+  --bg-soft:     #f8f4fc;   /* gentle off-white with a purple cast */
+  --bg-tint:     #f1e9f9;
+  --line:        rgba(25,10,40,.10);
+  --line-strong: rgba(25,10,40,.16);
+
+  /* ---- Dark sections (hero, final CTA, footer) ---- */
+  --dark-bg:      #160a24;
+  --dark-elev:    #20102f;
+  --dark-text:    #f6f1fb;
+  --dark-muted:   #c8b8da;
+  --dark-faint:   #9784ac;
+  --dark-line:    rgba(255,255,255,.14);
+
+  /* ---- Semantic ---- */
+  --primary:          var(--brand);
+  --primary-contrast: #ffffff;
+  --ring:             rgba(178,38,227,.55);
+  --shadow-sm:  0 4px 14px -6px rgba(74,18,115,.28);
+  --shadow:     0 18px 50px -22px rgba(74,18,115,.45);
+  --shadow-glow:0 14px 40px -10px rgba(178,38,227,.55);
+
+  /* ---- Type ---- */
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-body:    "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --fs-display: clamp(2.6rem, 6.2vw, 5rem);
+  --fs-h1:      clamp(2.3rem, 5vw, 3.6rem);
+  --fs-h2:      clamp(1.9rem, 3.8vw, 2.9rem);
+  --fs-h3:      clamp(1.2rem, 1.6vw, 1.45rem);
+  --fs-lead:    clamp(1.05rem, 1.5vw, 1.3rem);
+  --fs-body:    1.0625rem;
+  --fs-small:   .9rem;
+  --fs-eyebrow: .8125rem;
+
+  /* ---- Spacing / layout ---- */
+  --sp-1: .5rem;  --sp-2: 1rem;   --sp-3: 1.5rem; --sp-4: 2rem;
+  --sp-5: 3rem;   --sp-6: 4rem;   --sp-7: 6rem;   --sp-8: 8.5rem;
+  --maxw: 1180px;
+  --maxw-narrow: 760px;
+  --radius:    20px;
+  --radius-sm: 12px;
+  --radius-lg: 28px;
+  --radius-pill: 999px;
+  --blur: 16px;
+  --ease: cubic-bezier(.22,.7,.25,1);
+  --ease-out: cubic-bezier(.16,1,.3,1);
+}
