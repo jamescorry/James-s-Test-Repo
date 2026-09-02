@@ -1,0 +1,10 @@
+<settings>
+    <!--
+        The VIN is entered once from the phone, in Garmin Connect. It is only
+        needed to recognise the car's BLE advertisement and to personalise
+        message signatures - no network access is used at any point.
+    -->
+    <setting propertyKey="@Properties.Vin" title="@Strings.VinTitle" prompt="@Strings.VinPrompt">
+        <settingConfig type="alphaNumeric" maxLength="17" />
+    </setting>
+</settings>

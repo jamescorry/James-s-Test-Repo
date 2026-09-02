@@ -1,0 +1,24 @@
+<strings>
+    <string id="AppName">Watch Key</string>
+
+    <string id="VinTitle">Vehicle VIN</string>
+    <string id="VinPrompt">17-character VIN, found in your Tesla app under Additional Vehicle Information.</string>
+
+    <string id="StateNoVin">Set your VIN in\nGarmin Connect</string>
+    <string id="StateIdle">Ready</string>
+    <string id="StateScanning">Searching...</string>
+    <string id="StateConnecting">Connecting...</string>
+    <string id="StateHandshake">Authenticating...</string>
+    <string id="StateConnected">Connected</string>
+    <string id="StateSending">Sending...</string>
+    <string id="StateLocked">Locked</string>
+    <string id="StateUnlocked">Unlocked</string>
+
+    <string id="CmdUnlock">Unlock</string>
+    <string id="CmdLock">Lock</string>
+    <string id="CmdTrunk">Trunk</string>
+    <string id="CmdFrunk">Frunk</string>
+
+    <string id="PairTitle">Pair</string>
+    <string id="PairInstructions">Place your key card on the centre console when the car asks.</string>
+</strings>

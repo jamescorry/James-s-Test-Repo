@@ -229,3 +229,10 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+# Connect IQ
+bin/
+*.prg
+*.prg.debug.xml
+*.iq
+developer_key.der
