@@ -83,6 +83,34 @@ Or install the GUI SDK Manager from
 [developer.garmin.com/connect-iq/sdk](https://developer.garmin.com/connect-iq/sdk/)
 and add its `bin` directory to `PATH`.
 
+### On Windows
+
+Use the GUI, not the CLI above. The
+[SDK Manager](https://developer.garmin.com/connect-iq/sdk/) handles the Garmin
+sign-in and the device downloads together, which is the awkward part.
+
+1. Install the SDK Manager, sign in, and install an SDK plus the devices you
+   target.
+2. Install [VS Code](https://code.visualstudio.com/) and Garmin's **Monkey C**
+   extension.
+3. Command palette → **Monkey C: Generate a Developer Key**, then **Monkey C:
+   Build Current Project**.
+
+The extension does everything the scripts here do, including running the
+simulator. If you would rather build from a terminal, `scripts\build.ps1` is
+the PowerShell equivalent of `build.sh`:
+
+```powershell
+scripts\build.ps1                  # .prg for fenix7
+scripts\build.ps1 -Device venu3    # another device
+scripts\build.ps1 -Package         # store-ready .iq
+```
+
+The bash scripts also work under Git Bash. Note that
+`connect-iq-sdk-manager`'s installer puts the binary in Git Bash's
+`/usr/local/bin`, which is inside the Git for Windows tree and not on
+cmd.exe's `PATH` - run it from Git Bash if you use it at all.
+
 ### Build and run
 
 ```bash
