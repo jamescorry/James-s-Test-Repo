@@ -8,11 +8,17 @@ Lock, unlock, trunk and frunk.
 
 ## Status
 
-**Compiles; not yet run against a vehicle.** The protocol layer is implemented,
-its byte-level logic is checked against Tesla's published test vectors, and it
-builds clean for `fenix8pro47mm` with Connect IQ SDK 9.2.0 - no errors, no
-warnings. What remains is behaviour: nothing has talked to a car yet. See
-[What still needs doing](#what-still-needs-doing).
+**Runs in the simulator; not yet run against a vehicle.** The protocol layer is
+implemented, its byte-level logic is checked against Tesla's published test
+vectors, and it builds clean for `fenix8pro47mm` with Connect IQ SDK 9.2.0 - no
+errors, no warnings.
+
+In the simulator it launches, reads the VIN, renders, starts a BLE scan and
+times out to "Car not found", which is the correct outcome with no car in
+range. That exercises the state machine and the error path but not the
+cryptography: scanning never derives a key. Pairing is the first action that
+generates the key pair, so it is the next thing to run. Nothing has talked to a
+car yet. See [What still needs doing](#what-still-needs-doing).
 
 ## How it works
 
