@@ -4,7 +4,7 @@
     <string id="VinTitle">Vehicle VIN</string>
     <string id="VinPrompt">17-character VIN, found in your Tesla app under Additional Vehicle Information.</string>
 
-    <string id="StateNoVin">Set your VIN in\nGarmin Connect</string>
+    <string id="StateNoVin">Set your VIN in Garmin Connect</string>
     <string id="StateIdle">Ready</string>
     <string id="StateScanning">Searching...</string>
     <string id="StateConnecting">Connecting...</string>
@@ -20,5 +20,5 @@
     <string id="CmdFrunk">Frunk</string>
 
     <string id="PairTitle">Pair</string>
-    <string id="PairInstructions">Place your key card on the centre console when the car asks.</string>
+    <string id="PairInstructions">Tap your key card on the centre console when the car asks.</string>
 </strings>

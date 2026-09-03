@@ -44,13 +44,16 @@ class MainView extends WatchUi.View {
         var width = dc.getWidth();
         var height = dc.getHeight();
 
+        // Drawn near the top, where a round screen has narrowed, so this gets
+        // less width than the action label below it.
         dc.setColor(statusColour(), Graphics.COLOR_TRANSPARENT);
-        dc.drawText(
-            width / 2,
-            height * 0.20,
-            Graphics.FONT_TINY,
+        TextLayout.drawCentered(
+            dc,
             statusLine(),
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
+            Graphics.FONT_TINY,
+            width / 2,
+            (height * 0.22).toNumber(),
+            (width * 0.60).toNumber()
         );
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);

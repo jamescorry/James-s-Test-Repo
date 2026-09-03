@@ -34,13 +34,16 @@ class PairView extends WatchUi.View {
             ? WatchUi.loadResource(Rez.Strings.PairInstructions) as String
             : status;
 
+        // 72% of the width at the vertical centre, which is where a round
+        // screen is widest. The instruction is a sentence and needs wrapping.
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(
+        TextLayout.drawCentered(
+            dc,
+            body,
+            Graphics.FONT_TINY,
             width / 2,
             height / 2,
-            Graphics.FONT_TINY,
-            body,
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
+            (width * 0.72).toNumber()
         );
     }
 }
