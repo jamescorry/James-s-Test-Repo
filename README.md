@@ -8,11 +8,11 @@ Lock, unlock, trunk and frunk.
 
 ## Status
 
-**Not yet verified against a vehicle.** The protocol layer is implemented, its
-byte-level logic is checked against Tesla's published test vectors, and every
-source file parses. It has not been compiled with the Connect IQ SDK or run
-against a real car - compiling needs device files from Garmin's authenticated
-API. See [What still needs doing](#what-still-needs-doing).
+**Compiles; not yet run against a vehicle.** The protocol layer is implemented,
+its byte-level logic is checked against Tesla's published test vectors, and it
+builds clean for `fenix8pro47mm` with Connect IQ SDK 9.2.0 - no errors, no
+warnings. What remains is behaviour: nothing has talked to a car yet. See
+[What still needs doing](#what-still-needs-doing).
 
 ## How it works
 
@@ -171,23 +171,23 @@ Optional repository variables: `CONNECT_IQ_SDK_VERSION` (default `latest`) and
 
 Before this can go to the store:
 
-- [ ] **Compile it.** Syntax is checked by the parser, but type errors and
-      wrong API signatures need the real compiler. Set the Garmin secrets to
-      turn on the CI compile job, or build locally.
+- [x] **Compile it.** Builds clean for `fenix8pro47mm` on SDK 9.2.0. Other
+      devices in the manifest have not been built yet.
 - [ ] **Confirm the public key encoding.** Whether Connect IQ returns 65-byte
       `0x04 || X || Y` or bare 64-byte `X || Y` could not be settled from
       documentation. The code handles both, but this is the first thing to
       check against a car.
-- [ ] **Confirm BLE support per device.** All 13 product ids in
-      `manifest.xml` are verified as real - each one appears in the manifest of
-      a shipping open-source Connect IQ app - so the build will not fail on an
-      unknown device. What is still unverified is whether every one of them
-      supports Bluetooth Low Energy; the compiler will say so, since it rejects
-      a device that cannot provide a requested permission.
-- [ ] **Test against a vehicle**, including the three-connection limit and
-      behaviour when the car is asleep.
+- [ ] **Confirm BLE support per device.** All 14 product ids in `manifest.xml`
+      are verified as real, and `fenix8pro47mm` builds - which also proves that
+      device supports the BluetoothLowEnergy permission, since the compiler
+      rejects a device that cannot provide one. The other 13 are unbuilt;
+      `scripts/build.sh --package` covers them all at once.
+- [ ] **Test against a vehicle.** Next step: pair with the key card, then
+      lock/unlock. Also the three-connection limit and behaviour when the car
+      is asleep.
 - [ ] **Memory profile.** Widgets and apps have tight budgets on older devices.
-- [ ] **Replace the placeholder launcher icon.**
+- [ ] **Replace the placeholder launcher icon.** It is 65x65, sized for
+      `fenix8pro47mm`; other devices ask for other sizes and will scale it.
 - [ ] **Name and branding.** Apache 2.0 grants no trademark rights, so the
       store listing cannot lean on Tesla's marks. See `NOTICE`.
 
