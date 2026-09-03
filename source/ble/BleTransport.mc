@@ -33,6 +33,10 @@ class BleTransport extends Ble.BleDelegate {
     private var _device as Ble.Device?;
     private var _scanning as Boolean = false;
 
+    // Diagnostics: collect what the scan sees instead of connecting to it.
+    private var _diagnostic as Boolean = false;
+    private var _discovered as Array = [];
+
     private var _rxBuffer as ByteArray = []b;
     private var _txChunks as Array = [];
     private var _writeInFlight as Boolean = false;
@@ -76,7 +80,27 @@ class BleTransport extends Ble.BleDelegate {
         }
     }
 
+    //! Scan without connecting, recording every advertisement seen.
+    //!
+    //! "Car not found" on its own says nothing about why: the advertisement
+    //! may be absent, or present but not matching. This makes the difference
+    //! visible.
+    function startDiagnosticScan() as Void {
+        _diagnostic = true;
+        _discovered = [];
+        try {
+            Ble.setScanState(Ble.SCAN_STATE_SCANNING);
+        } catch (ex) {
+            notify(:onBleError, "Bluetooth unavailable");
+        }
+    }
+
+    function getDiscovered() as Array {
+        return _discovered;
+    }
+
     function stopScan() as Void {
+        _diagnostic = false;
         if (!_scanning) {
             return;
         }
@@ -137,6 +161,10 @@ class BleTransport extends Ble.BleDelegate {
             if (!(result instanceof Ble.ScanResult)) {
                 continue;
             }
+            if (_diagnostic) {
+                record(result);
+                continue;
+            }
             if (matches(result)) {
                 stopScan();
                 try {
@@ -192,6 +220,47 @@ class BleTransport extends Ble.BleDelegate {
     }
 
     // ---- internals ----
+
+    //! Note what an advertisement carries, for the diagnostics screen. Keeps
+    //! the strongest signal per name and caps the list, since a busy area
+    //! produces far more devices than a watch can show or hold.
+    private function record(result as Ble.ScanResult) as Void {
+        var name = result.getDeviceName();
+        var label = (name == null) ? "(no name)" : name;
+        var rssi = result.getRssi();
+
+        var advertisesTesla = false;
+        var uuids = result.getServiceUuids();
+        for (var uuid = uuids.next(); uuid != null; uuid = uuids.next()) {
+            if (uuid.equals(_service)) {
+                advertisesTesla = true;
+            }
+        }
+
+        for (var i = 0; i < _discovered.size(); i++) {
+            var seen = _discovered[i] as Dictionary;
+            if ((seen.get(:label) as String).equals(label)) {
+                if (rssi > (seen.get(:rssi) as Number)) {
+                    seen.put(:rssi, rssi);
+                }
+                if (advertisesTesla) {
+                    seen.put(:tesla, true);
+                }
+                return;
+            }
+        }
+
+        if (_discovered.size() >= 12) {
+            return;
+        }
+        _discovered.add({
+            :label => label,
+            :rssi => rssi,
+            :tesla => advertisesTesla,
+            :matches => matches(result)
+        });
+        notify(:onBleScanChanged, null);
+    }
 
     //! Prefer an exact local-name match, which identifies one specific VIN.
     //! Connect IQ does not always populate the device name in a scan result, so

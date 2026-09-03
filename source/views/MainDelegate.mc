@@ -30,6 +30,12 @@ class MainDelegate extends WatchUi.BehaviorDelegate {
             _manager.sendCommand(Vcsec.openTrunk());
         } else if (action == ACTION_FRUNK) {
             _manager.sendCommand(Vcsec.openFrunk());
+        } else if (action == ACTION_DIAGNOSE) {
+            WatchUi.pushView(
+                new ScanView(_manager),
+                new ScanDelegate(_manager),
+                WatchUi.SLIDE_LEFT
+            );
         } else {
             _manager.sendCommand(Vcsec.rkeAction(Vcsec.RKE_ACTION_UNLOCK));
         }

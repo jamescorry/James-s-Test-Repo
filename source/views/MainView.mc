@@ -8,6 +8,7 @@ enum Action {
     ACTION_LOCK,
     ACTION_TRUNK,
     ACTION_FRUNK,
+    ACTION_DIAGNOSE,
     ACTION_COUNT
 }
 
@@ -94,6 +95,8 @@ class MainView extends WatchUi.View {
             return WatchUi.loadResource(Rez.Strings.CmdTrunk) as String;
         } else if (action == ACTION_FRUNK) {
             return WatchUi.loadResource(Rez.Strings.CmdFrunk) as String;
+        } else if (action == ACTION_DIAGNOSE) {
+            return WatchUi.loadResource(Rez.Strings.CmdDiagnose) as String;
         }
         return WatchUi.loadResource(Rez.Strings.CmdUnlock) as String;
     }

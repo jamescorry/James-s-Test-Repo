@@ -129,10 +129,42 @@ class CommandManager {
         dispatch();
     }
 
+    //! Scan without connecting, for the diagnostics screen.
+    function startDiagnostics() as Void {
+        _timer.stop();
+        _pendingPayload = null;
+        _pendingIsPairing = false;
+        _transport.close();
+        _transport.startDiagnosticScan();
+        setState(STATE_SCANNING, "");
+    }
+
+    function stopDiagnostics() as Void {
+        _transport.stopScan();
+        setState(hasVin() ? STATE_IDLE : STATE_NO_VIN, "");
+    }
+
+    function getDiscovered() as Array {
+        return _transport.getDiscovered();
+    }
+
+    //! The VIN this app is looking for, and the advertisement name it implies.
+    function getExpectedName() as String {
+        if (!hasVin()) {
+            return "";
+        }
+        return CryptoUtils.bleLocalName(_vin);
+    }
+
     // ---- BLE events ----
 
     function onBleEvent(event as Symbol, argument) as Void {
-        if (event == :onBleConnecting) {
+        if (event == :onBleScanChanged) {
+            // Nothing to decide, just show what arrived.
+            if (_onChange != null) {
+                _onChange.invoke();
+            }
+        } else if (event == :onBleConnecting) {
             setState(STATE_CONNECTING, "");
         } else if (event == :onBleConnected) {
             onConnected();
