@@ -21,9 +21,10 @@ enum State {
 //! send. A command requested before the link is up is held and sent as soon as
 //! the session is established.
 class CommandManager {
-    //! Give up on a scan that finds nothing. The car is either out of range or
-    //! asleep in a way that stops it advertising.
-    private const SCAN_TIMEOUT_MS = 20000;
+    //! Give up on a scan that finds nothing. Connect IQ stops and restarts
+    //! scanning underneath us, and a parked car advertises slowly, so this has
+    //! to span several scan windows rather than one.
+    private const SCAN_TIMEOUT_MS = 45000;
 
     //! A signed command that gets no reply in this window has been lost.
     private const COMMAND_TIMEOUT_MS = 8000;

@@ -1,4 +1,5 @@
 import Toybox.Lang;
+import Toybox.Timer;
 using Toybox.BluetoothLowEnergy as Ble;
 
 //! BLE transport to a Tesla.
@@ -33,6 +34,12 @@ class BleTransport extends Ble.BleDelegate {
     private var _device as Ble.Device?;
     private var _scanning as Boolean = false;
 
+    // Connect IQ stops scanning on its own, so wanting to scan and actually
+    // scanning are different things. A car advertising slowly while parked
+    // falls outside a short window entirely.
+    private var _scanDesired as Boolean = false;
+    private var _scanTimer as Timer.Timer;
+
     // Diagnostics: collect what the scan sees instead of connecting to it.
     private var _diagnostic as Boolean = false;
     private var _discovered as Array = [];
@@ -44,6 +51,7 @@ class BleTransport extends Ble.BleDelegate {
     function initialize(listener) {
         BleDelegate.initialize();
         _listener = listener;
+        _scanTimer = new Timer.Timer();
         _service = Ble.stringToUuid(SERVICE_UUID);
         _writeChar = Ble.stringToUuid(WRITE_CHAR_UUID);
         _readChar = Ble.stringToUuid(READ_CHAR_UUID);
@@ -70,14 +78,11 @@ class BleTransport extends Ble.BleDelegate {
     //! Start looking for the car whose VIN hashes to `localName`.
     function startScan(localName as String) as Void {
         _targetName = localName;
+        _scanDesired = true;
         if (_scanning) {
             return;
         }
-        try {
-            Ble.setScanState(Ble.SCAN_STATE_SCANNING);
-        } catch (ex) {
-            notify(:onBleError, "Bluetooth unavailable");
-        }
+        enableScan();
     }
 
     //! Scan without connecting, recording every advertisement seen.
@@ -87,12 +92,9 @@ class BleTransport extends Ble.BleDelegate {
     //! visible.
     function startDiagnosticScan() as Void {
         _diagnostic = true;
+        _scanDesired = true;
         _discovered = [];
-        try {
-            Ble.setScanState(Ble.SCAN_STATE_SCANNING);
-        } catch (ex) {
-            notify(:onBleError, "Bluetooth unavailable");
-        }
+        enableScan();
     }
 
     //! Strongest signal first: standing next to the car, it should lead.
@@ -131,6 +133,8 @@ class BleTransport extends Ble.BleDelegate {
 
     function stopScan() as Void {
         _diagnostic = false;
+        _scanDesired = false;
+        _scanTimer.stop();
         if (!_scanning) {
             return;
         }
@@ -184,6 +188,28 @@ class BleTransport extends Ble.BleDelegate {
 
     function onScanStateChange(scanState as Ble.ScanState, status as Ble.Status) as Void {
         _scanning = (scanState == Ble.SCAN_STATE_SCANNING);
+
+        // Scanning stopping while it is still wanted is normal, not an error.
+        // Restart it, or a slowly advertising car is never seen.
+        if (!_scanning && _scanDesired) {
+            _scanTimer.stop();
+            _scanTimer.start(method(:resumeScan), 1000, false);
+        }
+    }
+
+    //! Public because Timer needs a bound method reference to it.
+    function resumeScan() as Void {
+        if (_scanDesired && !_scanning) {
+            enableScan();
+        }
+    }
+
+    private function enableScan() as Void {
+        try {
+            Ble.setScanState(Ble.SCAN_STATE_SCANNING);
+        } catch (ex) {
+            notify(:onBleError, "Bluetooth unavailable");
+        }
     }
 
     function onScanResults(scanResults as Ble.Iterator) as Void {
@@ -327,7 +353,9 @@ class BleTransport extends Ble.BleDelegate {
     private function matches(result as Ble.ScanResult) as Boolean {
         var name = result.getDeviceName();
         if (name != null && _targetName != null) {
-            return name.equals(_targetName);
+            // Tesla's spec gives the name with lower-case hex, but a real car
+            // was observed advertising it upper-case. Compare without case.
+            return name.toLower().equals(_targetName.toLower());
         }
         var uuids = result.getServiceUuids();
         for (var uuid = uuids.next(); uuid != null; uuid = uuids.next()) {
