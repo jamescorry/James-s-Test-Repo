@@ -288,9 +288,15 @@ class BleTransport extends Ble.BleDelegate {
             break;
         }
 
+        // Key on name AND manufacturer data, not name alone. Unnamed devices
+        // are exactly what this screen exists to find, and keying on the
+        // label alone collapsed every one of them into a single "(no name)"
+        // row - hiding the car behind whatever unnamed device was loudest.
         for (var i = 0; i < _discovered.size(); i++) {
             var seen = _discovered[i] as Dictionary;
-            if ((seen.get(:label) as String).equals(label)) {
+            var sameName = (seen.get(:label) as String).equals(label);
+            var sameManufacturer = (seen.get(:manufacturer) as String).equals(manufacturer);
+            if (sameName && sameManufacturer) {
                 if (rssi > (seen.get(:rssi) as Number)) {
                     seen.put(:rssi, rssi);
                 }

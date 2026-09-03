@@ -56,6 +56,18 @@ class ScanView extends WatchUi.View {
         );
 
         var found = _manager.getDiscovered();
+
+        // The count matters: if it says four but only two rows are visible,
+        // the rest are below the fold rather than absent.
+        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(
+            width / 2,
+            height * 0.86,
+            font,
+            found.size().toString() + " seen",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
+        );
+
         if (found.size() == 0) {
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(
@@ -68,11 +80,11 @@ class ScanView extends WatchUi.View {
             return;
         }
 
-        // Three devices, two lines each: identity and signal, then the
+        // Four devices, two lines each: identity and signal, then the
         // manufacturer data that has to stand in for a name. Sorted strongest
         // first, so the car leads when you are standing next to it.
-        var rows = found.size() > 3 ? 3 : found.size();
-        var top = (height * 0.38).toNumber();
+        var rows = found.size() > 4 ? 4 : found.size();
+        var top = (height * 0.36).toNumber();
 
         for (var i = 0; i < rows; i++) {
             var entry = found[i] as Dictionary;
