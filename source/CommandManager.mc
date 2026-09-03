@@ -160,7 +160,12 @@ class CommandManager {
     // ---- BLE events ----
 
     function onBleEvent(event as Symbol, argument) as Void {
-        if (event == :onBleScanChanged) {
+        if (event == :onBleWrongDevice) {
+            // Connected to something that turned out not to be a car, and the
+            // scan has resumed. Show the count so a long search looks like
+            // progress rather than a hang.
+            setState(STATE_SCANNING, "Checking " + argument.toString());
+        } else if (event == :onBleScanChanged) {
             // Nothing to decide, just show what arrived.
             if (_onChange != null) {
                 _onChange.invoke();

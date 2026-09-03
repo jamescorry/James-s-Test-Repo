@@ -25,6 +25,10 @@ class BleTransport extends Ble.BleDelegate {
     //! length beyond it means the stream has desynchronised.
     private const MAX_MESSAGE_SIZE = 1024;
 
+    //! Do not try to connect to nameless devices weaker than this. The car you
+    //! are standing next to is loud; a neighbour's doorbell is not.
+    private const CANDIDATE_MIN_RSSI = -75;
+
     private var _service as Ble.Uuid;
     private var _writeChar as Ble.Uuid;
     private var _readChar as Ble.Uuid;
@@ -39,6 +43,11 @@ class BleTransport extends Ble.BleDelegate {
     // falls outside a short window entirely.
     private var _scanDesired as Boolean = false;
     private var _scanTimer as Timer.Timer;
+
+    // A connection attempt in progress. Scanning is paused for it, and must
+    // not be restarted underneath it by the keep-alive.
+    private var _connecting as Boolean = false;
+    private var _rejected as Number = 0;
 
     // Diagnostics: collect what the scan sees instead of connecting to it.
     private var _diagnostic as Boolean = false;
@@ -191,7 +200,7 @@ class BleTransport extends Ble.BleDelegate {
 
         // Scanning stopping while it is still wanted is normal, not an error.
         // Restart it, or a slowly advertising car is never seen.
-        if (!_scanning && _scanDesired) {
+        if (!_scanning && _scanDesired && !_connecting) {
             _scanTimer.stop();
             _scanTimer.start(method(:resumeScan), 1000, false);
         }
@@ -199,8 +208,18 @@ class BleTransport extends Ble.BleDelegate {
 
     //! Public because Timer needs a bound method reference to it.
     function resumeScan() as Void {
-        if (_scanDesired && !_scanning) {
+        if (_scanDesired && !_scanning && !_connecting) {
             enableScan();
+        }
+    }
+
+    //! Stop the radio without giving up the intent to scan, so the keep-alive
+    //! knows to resume once a connection attempt resolves.
+    private function pauseScan() as Void {
+        try {
+            Ble.setScanState(Ble.SCAN_STATE_OFF);
+        } catch (ex) {
+            // Already off.
         }
     }
 
@@ -221,12 +240,14 @@ class BleTransport extends Ble.BleDelegate {
                 record(result);
                 continue;
             }
-            if (matches(result)) {
-                stopScan();
+            if (isCandidate(result)) {
+                pauseScan();
+                _connecting = true;
                 try {
                     _device = Ble.pairDevice(result);
                     notify(:onBleConnecting, null);
                 } catch (ex) {
+                    _connecting = false;
                     notify(:onBleError, "Could not connect");
                 }
                 return;
@@ -237,12 +258,33 @@ class BleTransport extends Ble.BleDelegate {
     function onConnectedStateChanged(device as Ble.Device, state as Ble.ConnectionState) as Void {
         if (state == Ble.CONNECTION_STATE_CONNECTED) {
             _device = device;
+            _connecting = false;
+
+            // Identify the car after connecting rather than before. Its
+            // advertisement carries no name that Connect IQ will surface, no
+            // service uuid and no manufacturer data - but the VCSEC service is
+            // always in the GATT table once connected.
+            if (device.getService(_service) == null) {
+                _rejected++;
+                _device = null;
+                try {
+                    Ble.unpairDevice(device);
+                } catch (ex) {
+                    // Nothing useful to do.
+                }
+                notify(:onBleWrongDevice, _rejected);
+                resumeScan();
+                return;
+            }
+
+            _rejected = 0;
             _rxBuffer = []b;
             _txChunks = [];
             _writeInFlight = false;
             enableNotifications();
         } else {
             _device = null;
+            _connecting = false;
             notify(:onBleDisconnected, null);
         }
     }
@@ -344,6 +386,26 @@ class BleTransport extends Ble.BleDelegate {
             :manufacturer => manufacturer
         });
         notify(:onBleScanChanged, null);
+    }
+
+    //! Worth connecting to and inspecting.
+    //!
+    //! A definite match is taken as-is. Otherwise this accepts a nameless
+    //! advertisement carrying no manufacturer data, which is what a Tesla
+    //! looks like through Connect IQ, and which excludes the beacons and
+    //! consumer electronics that fill a scan. Signal strength keeps it to
+    //! devices that are plausibly the car in front of you.
+    private function isCandidate(result as Ble.ScanResult) as Boolean {
+        if (matches(result)) {
+            return true;
+        }
+        if (result.getDeviceName() != null) {
+            return false;
+        }
+        if (result.getRssi() < CANDIDATE_MIN_RSSI) {
+            return false;
+        }
+        return result.getManufacturerSpecificDataIterator().next() == null;
     }
 
     //! Prefer an exact local-name match, which identifies one specific VIN.
