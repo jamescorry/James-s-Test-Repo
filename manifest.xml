@@ -3,12 +3,17 @@
   <!--
     Watch Key. A direct Bluetooth LE key for Tesla vehicles.
 
+    The application id is bound to whichever Connect IQ account first uploads
+    it, and deleting the store listing does not release it - hence this id
+    having been reissued once already. Upload from the account you intend to
+    keep.
+
     minApiLevel 3.1.0 is the floor for Toybox.BluetoothLowEnergy. Note that
     Garmin's monetization programme only covers System 7 devices, so the
     sellable device set is narrower than the compatible one - see README.
   -->
   <iq:application
-      id="edba547a332141a5a3cd6199f9e2bf4c"
+      id="dfdadf2b8f3c49e19745b5515aa11568"
       type="watch-app"
       name="@Strings.AppName"
       entry="WatchKeyApp"
