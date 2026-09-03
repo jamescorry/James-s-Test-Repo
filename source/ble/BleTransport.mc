@@ -95,8 +95,38 @@ class BleTransport extends Ble.BleDelegate {
         }
     }
 
+    //! Strongest signal first: standing next to the car, it should lead.
     function getDiscovered() as Array {
-        return _discovered;
+        var sorted = [];
+        var remaining = _discovered.slice(0, null);
+        while (remaining.size() > 0) {
+            var best = 0;
+            for (var i = 1; i < remaining.size(); i++) {
+                if (((remaining[i] as Dictionary).get(:rssi) as Number) >
+                    ((remaining[best] as Dictionary).get(:rssi) as Number)) {
+                    best = i;
+                }
+            }
+            sorted.add(remaining[best]);
+            var next = remaining.slice(0, best);
+            next.addAll(remaining.slice(best + 1, null));
+            remaining = next;
+        }
+        return sorted;
+    }
+
+    private function hex16(value as Number) as String {
+        return "0x" + CryptoUtils.hexByte((value >> 8) & 0xFF) +
+               CryptoUtils.hexByte(value & 0xFF);
+    }
+
+    private function hexBytes(data as ByteArray, limit as Number) as String {
+        var out = "";
+        var count = data.size() < limit ? data.size() : limit;
+        for (var i = 0; i < count; i++) {
+            out += CryptoUtils.hexByte(data[i]);
+        }
+        return out;
     }
 
     function stopScan() as Void {
@@ -237,6 +267,27 @@ class BleTransport extends Ble.BleDelegate {
             }
         }
 
+        // Connect IQ does not reliably surface the advertised local name, and
+        // Tesla does not advertise its service uuid - it only appears in the
+        // GATT table once connected. Manufacturer data is what is left to
+        // recognise a car by, so show it.
+        var manufacturer = "";
+        var iterator = result.getManufacturerSpecificDataIterator();
+        for (var entry = iterator.next(); entry != null; entry = iterator.next()) {
+            if (!(entry instanceof Dictionary)) {
+                continue;
+            }
+            var companyId = entry.get(:companyId);
+            var payload = entry.get(:data);
+            if (companyId instanceof Lang.Number) {
+                manufacturer = hex16(companyId);
+            }
+            if (payload instanceof ByteArray) {
+                manufacturer += " " + hexBytes(payload, 4);
+            }
+            break;
+        }
+
         for (var i = 0; i < _discovered.size(); i++) {
             var seen = _discovered[i] as Dictionary;
             if ((seen.get(:label) as String).equals(label)) {
@@ -257,7 +308,8 @@ class BleTransport extends Ble.BleDelegate {
             :label => label,
             :rssi => rssi,
             :tesla => advertisesTesla,
-            :matches => matches(result)
+            :matches => matches(result),
+            :manufacturer => manufacturer
         });
         notify(:onBleScanChanged, null);
     }

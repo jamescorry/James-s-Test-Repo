@@ -68,15 +68,15 @@ class ScanView extends WatchUi.View {
             return;
         }
 
-        // Five rows is all a round screen fits legibly; the strongest signals
-        // are the ones worth seeing.
-        var rows = found.size() > 5 ? 5 : found.size();
-        var top = (height * 0.40).toNumber();
+        // Three devices, two lines each: identity and signal, then the
+        // manufacturer data that has to stand in for a name. Sorted strongest
+        // first, so the car leads when you are standing next to it.
+        var rows = found.size() > 3 ? 3 : found.size();
+        var top = (height * 0.38).toNumber();
 
         for (var i = 0; i < rows; i++) {
             var entry = found[i] as Dictionary;
-            var label = entry.get(:label) as String;
-            var rssi = entry.get(:rssi) as Number;
+            var y = top + i * 2 * lineHeight;
 
             // Green when this advertisement is one the app would connect to,
             // blue when it carries Tesla's service uuid but did not match.
@@ -85,14 +85,25 @@ class ScanView extends WatchUi.View {
             } else if (entry.get(:tesla) as Boolean) {
                 dc.setColor(Graphics.COLOR_BLUE, Graphics.COLOR_TRANSPARENT);
             } else {
-                dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+                dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
             }
 
             dc.drawText(
                 width / 2,
-                top + i * lineHeight,
+                y,
                 font,
-                truncate(label, 16) + "  " + rssi.toString(),
+                truncate(entry.get(:label) as String, 14) + "  " +
+                    (entry.get(:rssi) as Number).toString(),
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
+            );
+
+            var manufacturer = entry.get(:manufacturer) as String;
+            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(
+                width / 2,
+                y + lineHeight,
+                font,
+                manufacturer.equals("") ? "no mfg data" : manufacturer,
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
             );
         }
