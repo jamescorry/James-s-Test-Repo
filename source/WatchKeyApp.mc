@@ -21,9 +21,8 @@ class WatchKeyApp extends Application.AppBase {
         _manager.stop();
     }
 
-    function getInitialView() as Array<Views or InputDelegates>? {
-        var view = new MainView(_manager);
-        return [view, new MainDelegate(_manager)] as Array<Views or InputDelegates>;
+    function getInitialView() as [Views] or [Views, InputDelegates] {
+        return [new MainView(_manager), new MainDelegate(_manager)];
     }
 
     //! The VIN lives in app settings, so a change from the phone has to be

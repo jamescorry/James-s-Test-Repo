@@ -136,11 +136,7 @@ module UniversalMessage {
     //! reported no error.
     function faultOf(message as Dictionary) as Number {
         var status = Protobuf.submessage(message, FIELD_STATUS);
-        var fault = status.get(FIELD_SIGNED_MESSAGE_FAULT);
-        if (fault == null) {
-            return 0;
-        }
-        return fault.toNumber();
+        return Protobuf.numberOf(status, FIELD_SIGNED_MESSAGE_FAULT, 0);
     }
 
     //! Human-readable text for the fault codes a key app can actually hit.

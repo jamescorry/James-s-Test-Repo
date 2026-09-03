@@ -73,12 +73,12 @@ class Session {
             _epoch = epoch;
         }
 
-        var counter = fields.get(UniversalMessage.FIELD_SESSION_COUNTER);
-        _counter = (counter == null) ? 0 : counter.toNumber();
+        _counter = Protobuf.numberOf(fields, UniversalMessage.FIELD_SESSION_COUNTER, 0);
 
-        var clockTime = fields.get(UniversalMessage.FIELD_SESSION_CLOCK_TIME);
-        if (clockTime != null) {
-            _clockOffset = clockTime.toNumber() - localSeconds();
+        if (fields.hasKey(UniversalMessage.FIELD_SESSION_CLOCK_TIME)) {
+            _clockOffset =
+                Protobuf.numberOf(fields, UniversalMessage.FIELD_SESSION_CLOCK_TIME, 0) -
+                localSeconds();
         }
 
         _established = true;
@@ -127,7 +127,7 @@ class Session {
     //! handshake. K survives - it only depends on the two key pairs.
     function invalidate() as Void {
         _established = false;
-        _epoch = null;
+        _epoch = []b;
         _counter = 0;
     }
 

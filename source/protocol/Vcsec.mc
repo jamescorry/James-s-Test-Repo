@@ -118,12 +118,13 @@ module Vcsec {
     //! most of them will not be a status.
     function lockStateOf(payload as ByteArray) as Number? {
         var message = Protobuf.decode(payload);
-        var status = Protobuf.submessage(message, FIELD_VEHICLE_STATUS);
-        var lockState = status.get(FIELD_VEHICLE_LOCK_STATE);
-        if (lockState == null) {
+        if (!message.hasKey(FIELD_VEHICLE_STATUS)) {
             return null;
         }
-        return lockState.toNumber();
+        // VEHICLELOCKSTATE_UNLOCKED is 0, which proto3 omits, so an absent
+        // field inside a present VehicleStatus means unlocked - not missing.
+        var status = Protobuf.submessage(message, FIELD_VEHICLE_STATUS);
+        return Protobuf.numberOf(status, FIELD_VEHICLE_LOCK_STATE, VEHICLELOCKSTATE_UNLOCKED);
     }
 
     //! The operationStatus of a command reply, or null when the message is not
@@ -139,10 +140,6 @@ module Vcsec {
             return null;
         }
         var status = Protobuf.submessage(message, FIELD_COMMAND_STATUS);
-        var operationStatus = status.get(FIELD_OPERATION_STATUS);
-        if (operationStatus == null) {
-            return OPERATIONSTATUS_OK;
-        }
-        return operationStatus.toNumber();
+        return Protobuf.numberOf(status, FIELD_OPERATION_STATUS, OPERATIONSTATUS_OK);
     }
 }

@@ -59,6 +59,13 @@ module CryptoUtils {
     }
 
     //! The shared session key: K = SHA1(BIG_ENDIAN(Sx, 32))[:16].
+    //!
+    //! Type checking is off for this one function because the SDK declares
+    //! Cryptography.createPublicKey's first parameter as HashAlgorithm, while
+    //! the value it requires is a KeyPairAlgorithm - Garmin's own
+    //! BluetoothMeshBarrel passes KEY_PAIR_ELLIPTIC_CURVE_SECP256R1 here too.
+    //! The call is correct; only the annotation is wrong.
+    (:typecheck(false))
     function sessionKey(vehiclePublicKey as ByteArray) as ByteArray {
         var agreement = new Cryptography.KeyAgreement({
             :protocol => Cryptography.KEY_AGREEMENT_ECDH,

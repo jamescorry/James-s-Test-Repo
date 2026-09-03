@@ -151,6 +151,22 @@ module Protobuf {
         return null;
     }
 
+    //! Read a numeric field as a Number, falling back when it is absent.
+    //!
+    //! decode() yields Long for varints and Number for fixed32, and Dictionary
+    //! .get returns Object?, so callers cannot simply invoke toNumber on the
+    //! result. This narrows the type in one place instead of at every use.
+    function numberOf(fields as Dictionary, field as Number, fallback as Number) as Number {
+        var value = fields.get(field);
+        if (value instanceof Lang.Long) {
+            return value.toNumber();
+        }
+        if (value instanceof Lang.Number) {
+            return value;
+        }
+        return fallback;
+    }
+
     //! Read a nested message field, returning an empty dictionary when absent.
     function submessage(parent as Dictionary, field as Number) as Dictionary {
         var raw = parent.get(field);
