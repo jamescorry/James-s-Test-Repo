@@ -8,10 +8,11 @@ Lock, unlock, trunk and frunk.
 
 ## Status
 
-**Not yet verified against a vehicle.** The protocol layer is implemented and
-its byte-level logic is checked against Tesla's published test vectors, but the
-app has not been compiled with the Connect IQ SDK or run against a real car.
-See [What still needs doing](#what-still-needs-doing).
+**Not yet verified against a vehicle.** The protocol layer is implemented, its
+byte-level logic is checked against Tesla's published test vectors, and every
+source file parses. It has not been compiled with the Connect IQ SDK or run
+against a real car - compiling needs device files from Garmin's authenticated
+API. See [What still needs doing](#what-still-needs-doing).
 
 ## How it works
 
@@ -56,18 +57,78 @@ codec works directly on the wire format and messages are built field by field.
 
 ## Building
 
-Requires the [Connect IQ SDK](https://developer.garmin.com/connect-iq/sdk/) and
-the Monkey C extension for VS Code.
+### What you need, and why it is not one download
 
-```
-monkeyc -f monkey.jungle -o bin/watchkey.prg -y developer_key.der -d fenix7
+The Connect IQ SDK is a plain unauthenticated download, listed at
+`https://developer.garmin.com/downloads/connect-iq/sdks/sdks.json`. Since SDK
+3.2, though, the **device files** are separate, and they come from Garmin's
+authenticated API (`api.gcs.garmin.com`). So compiling for any device needs a
+Garmin account, whether you use the GUI SDK Manager or automate it.
+
+The easiest headless route is
+[connect-iq-sdk-manager-cli](https://github.com/lindell/connect-iq-sdk-manager-cli):
+
+```bash
+curl -s https://raw.githubusercontent.com/lindell/connect-iq-sdk-manager-cli/master/install.sh | sh
+
+connect-iq-sdk-manager agreement view      # read it, note the hash
+connect-iq-sdk-manager agreement accept
+connect-iq-sdk-manager login               # Garmin account
+connect-iq-sdk-manager sdk set latest
+export PATH="$(connect-iq-sdk-manager sdk current-path --bin):$PATH"
+connect-iq-sdk-manager device download --manifest=manifest.xml
 ```
 
-To check the protocol logic without any of that:
+Or install the GUI SDK Manager from
+[developer.garmin.com/connect-iq/sdk](https://developer.garmin.com/connect-iq/sdk/)
+and add its `bin` directory to `PATH`.
 
+### Build and run
+
+```bash
+scripts/build.sh              # .prg for fenix7
+scripts/build.sh venu3        # .prg for another device
+scripts/build.sh --package    # store-ready .iq for every product in the manifest
+scripts/run.sh                # build, then side-load into the simulator
 ```
-python3 tools/verify_vectors.py
+
+`scripts/build.sh` generates a signing key on first run if one is missing.
+That key is your publisher identity - it is gitignored, and losing it means
+you cannot ship updates to the same store listing.
+
+**What the simulator can tell you:** the UI, the state machine and the error
+paths. Not the Bluetooth link - there is no car to talk to, so scanning just
+times out. Confirming the watch actually unlocks a Tesla needs a physical
+watch and a physical car.
+
+### Checks that need no SDK and no account
+
+Both of these run in CI on every push, and locally:
+
+```bash
+npm install && npm run check     # parse every .mc file for syntax errors
+python3 tools/verify_vectors.py  # check the wire logic against Tesla's vectors
 ```
+
+The syntax check uses the open-source Monkey C parser behind
+[@markw65/prettier-plugin-monkeyc](https://github.com/markw65/prettier-plugin-monkeyc).
+It parses only - it will not catch type errors or unknown API calls, which
+need the real compiler.
+
+### CI
+
+`.github/workflows/ci.yml` always runs the two checks above. It also has a
+compile job that does a real `monkeyc` build, which runs only once these
+repository secrets are set:
+
+| Secret | Value |
+| --- | --- |
+| `GARMIN_USERNAME` | Garmin account email |
+| `GARMIN_PASSWORD` | Garmin account password |
+| `GARMIN_AGREEMENT_HASH` | Hash printed by `connect-iq-sdk-manager agreement view` |
+
+Optional repository variables: `CONNECT_IQ_SDK_VERSION` (default `latest`) and
+`CONNECT_IQ_DEVICE` (default `fenix7`).
 
 ## Setup on the watch
 
@@ -82,8 +143,9 @@ python3 tools/verify_vectors.py
 
 Before this can go to the store:
 
-- [ ] **Compile it.** Written without an SDK to hand, so expect syntax and API
-      fixes on the first build.
+- [ ] **Compile it.** Syntax is checked by the parser, but type errors and
+      wrong API signatures need the real compiler. Set the Garmin secrets to
+      turn on the CI compile job, or build locally.
 - [ ] **Confirm the public key encoding.** Whether Connect IQ returns 65-byte
       `0x04 || X || Y` or bare 64-byte `X || Y` could not be settled from
       documentation. The code handles both, but this is the first thing to

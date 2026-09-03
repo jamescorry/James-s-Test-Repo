@@ -1,0 +1,12 @@
+{
+  "name": "watch-key",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node tools/check_syntax.mjs"
+  },
+  "devDependencies": {
+    "@markw65/prettier-plugin-monkeyc": "^1.0.69",
+    "prettier": "^3.0.0"
+  }
+}

@@ -1,6 +1,5 @@
 import Toybox.Lang;
-import Toybox.System;
-import Toybox.BluetoothLowEnergy as Ble;
+using Toybox.BluetoothLowEnergy as Ble;
 
 //! BLE transport to a Tesla.
 //!

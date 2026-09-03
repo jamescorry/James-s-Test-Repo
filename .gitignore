@@ -236,3 +236,7 @@ bin/
 *.prg.debug.xml
 *.iq
 developer_key.der
+
+# Node
+node_modules/
+package-lock.json
