@@ -148,14 +148,34 @@ class CommandManager {
     // ---- internals ----
 
     private function dispatch() as Void {
-        if (_transport.isConnected() && _state == STATE_READY) {
-            transmitPending();
+        // VCSEC is memory constrained and often omits request_uuid from its
+        // replies, so there is no way to tell whose response is whose. One
+        // command at a time; a second button press while one is in flight is
+        // dropped rather than queued.
+        if (_state == STATE_SENDING) {
+            _pendingPayload = null;
+            _pendingIsPairing = false;
             return;
         }
+
+        // Reuse a live link. Reaching the scan below while still connected
+        // would start a BLE scan on top of an open connection - which is what
+        // happened after a rejected command left the state at ERROR.
+        if (_transport.isConnected()) {
+            if (_pendingIsPairing || (_session != null && _session.isEstablished())) {
+                transmitPending();
+            } else {
+                setState(STATE_HANDSHAKE, "");
+                beginHandshake();
+            }
+            return;
+        }
+
         if (_state == STATE_SCANNING || _state == STATE_CONNECTING || _state == STATE_HANDSHAKE) {
             // Already on the way; the pending command goes out when ready.
             return;
         }
+
         setState(STATE_SCANNING, "");
         _transport.startScan(CryptoUtils.bleLocalName(_vin));
         restartTimer(SCAN_TIMEOUT_MS);

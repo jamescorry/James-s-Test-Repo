@@ -3,21 +3,22 @@ import Toybox.Lang;
 import Toybox.WatchUi;
 
 class WatchKeyApp extends Application.AppBase {
-    private var _manager as CommandManager?;
+    // Built here rather than in onStart so it is never null: getInitialView
+    // hands it straight to the view, and a nullable field there is a type
+    // error the compiler will reject.
+    private var _manager as CommandManager;
 
     function initialize() {
         AppBase.initialize();
+        _manager = new CommandManager(method(:onManagerChange));
     }
 
     function onStart(state as Dictionary?) as Void {
-        _manager = new CommandManager(method(:onManagerChange));
         _manager.start();
     }
 
     function onStop(state as Dictionary?) as Void {
-        if (_manager != null) {
-            _manager.stop();
-        }
+        _manager.stop();
     }
 
     function getInitialView() as Array<Views or InputDelegates>? {
@@ -28,9 +29,7 @@ class WatchKeyApp extends Application.AppBase {
     //! The VIN lives in app settings, so a change from the phone has to be
     //! picked up without restarting the app.
     function onSettingsChanged() as Void {
-        if (_manager != null) {
-            _manager.reloadVin();
-        }
+        _manager.reloadVin();
         WatchUi.requestUpdate();
     }
 

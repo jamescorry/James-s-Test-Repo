@@ -150,8 +150,12 @@ Before this can go to the store:
       `0x04 || X || Y` or bare 64-byte `X || Y` could not be settled from
       documentation. The code handles both, but this is the first thing to
       check against a car.
-- [ ] **Verify the product list** in `manifest.xml`. Every entry must support
-      BLE, and an invalid product id fails the build.
+- [ ] **Confirm BLE support per device.** All 13 product ids in
+      `manifest.xml` are verified as real - each one appears in the manifest of
+      a shipping open-source Connect IQ app - so the build will not fail on an
+      unknown device. What is still unverified is whether every one of them
+      supports Bluetooth Low Energy; the compiler will say so, since it rejects
+      a device that cannot provide a requested permission.
 - [ ] **Test against a vehicle**, including the three-connection limit and
       behaviour when the car is asleep.
 - [ ] **Memory profile.** Widgets and apps have tight budgets on older devices.
