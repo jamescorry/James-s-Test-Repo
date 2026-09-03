@@ -158,6 +158,24 @@ repository secrets are set:
 Optional repository variables: `CONNECT_IQ_SDK_VERSION` (default `latest`) and
 `CONNECT_IQ_DEVICE` (default `fenix7`).
 
+## Testing without a phone
+
+The VIN is normally entered from Garmin Connect, which is awkward for a
+sideloaded build and impossible in the simulator if the settings editor will
+not open. Either way there is a shortcut: `Properties.getValue` returns the
+default declared in `resources/settings/properties.xml`, so a VIN put there is
+built into the app.
+
+```xml
+<property id="Vin" type="string">5YJ30123456789ABC</property>
+```
+
+Rebuild and the app skips straight past the "set your VIN" screen. Do not
+commit a real VIN - it identifies a specific car and this repository is public.
+
+In the simulator, the settings editor is **Settings > Trigger App Settings**.
+It greys out when no app is running, so open it with the app on screen.
+
 ## Setup on the watch
 
 1. Enter the car's VIN in app settings, from Garmin Connect on the phone. This

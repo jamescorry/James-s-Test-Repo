@@ -1,3 +1,12 @@
 <properties>
+    <!--
+        The VIN. Normally set from Garmin Connect on the phone, but the value
+        below is the default the app starts with, so putting a VIN here builds
+        it straight into the app - no settings UI, no phone. That is the
+        quickest way to test a sideloaded or simulator build.
+
+        Do not commit a real VIN: it identifies a specific car, and this file
+        is public. Keep it empty here and change it only locally.
+    -->
     <property id="Vin" type="string"></property>
 </properties>
