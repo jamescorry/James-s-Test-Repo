@@ -196,6 +196,11 @@ It greys out when no app is running, so open it with the app on screen.
 
 ## Debugging on the watch
 
+The version shows at the bottom of the main screen, in the Pair and Log
+titles, and as the first log line. Bump it in both `manifest.xml` and
+`source/Version.mc` before each sideload; `npm run check` fails if the two
+disagree.
+
 There is no console, so the app keeps its own event log. From the main
 screen, scroll to **Log** and press select: every BLE callback, state change,
 message sent and message received is there with a timestamp, newest at the

@@ -41,7 +41,7 @@ class LogView extends WatchUi.View {
             width / 2,
             height * 0.12,
             Graphics.FONT_TINY,
-            WatchUi.loadResource(Rez.Strings.LogTitle) as String,
+            (WatchUi.loadResource(Rez.Strings.LogTitle) as String) + " " + Version.label(),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
         );
 

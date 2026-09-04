@@ -28,7 +28,7 @@ class PairView extends WatchUi.View {
             width / 2,
             height * 0.14,
             Graphics.FONT_SMALL,
-            WatchUi.loadResource(Rez.Strings.PairTitle) as String,
+            (WatchUi.loadResource(Rez.Strings.PairTitle) as String) + " " + Version.label(),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
         );
 

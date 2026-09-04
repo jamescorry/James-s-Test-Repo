@@ -68,6 +68,16 @@ class MainView extends WatchUi.View {
         );
 
         drawSelectionDots(dc, width, height);
+
+        // Always visible, so a fresh sideload is recognisable at a glance.
+        dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(
+            width / 2,
+            height * 0.89,
+            Graphics.FONT_XTINY,
+            Version.label(),
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
+        );
     }
 
     //! One dot per action showing which action is selected - cheaper to read at a

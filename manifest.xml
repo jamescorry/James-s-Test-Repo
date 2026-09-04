@@ -18,7 +18,8 @@
       name="@Strings.AppName"
       entry="WatchKeyApp"
       launcherIcon="@Drawables.LauncherIcon"
-      minApiLevel="3.1.0">
+      minApiLevel="3.1.0"
+      version="0.4.0">
     <!--
       Every product listed here must support BluetoothLowEnergy. Verify with
       "Monkey C: Edit Products" in VS Code before the first store submission -

@@ -10,6 +10,7 @@ class WatchKeyApp extends Application.AppBase {
 
     function initialize() {
         AppBase.initialize();
+        DebugLog.add(Version.label());
         _manager = new CommandManager(method(:onManagerChange));
     }
 
