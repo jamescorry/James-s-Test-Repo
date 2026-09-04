@@ -339,9 +339,16 @@ class CommandManager {
         }
 
         if (commandStatus == Vcsec.OPERATIONSTATUS_WAIT) {
-            // VCSEC is busy with another request, or waiting on the key card
-            // tap during pairing. Either way the command is still in flight.
-            restartTimer(COMMAND_TIMEOUT_MS);
+            // During pairing this is the car saying it is ready for the key
+            // card - it shows nothing on screen, so the watch has to say so -
+            // and the window has to allow for a person walking to the console.
+            // Outside pairing it just means VCSEC is busy.
+            if (_pendingIsPairing) {
+                setState(STATE_SENDING, "Tap key card now");
+                restartTimer(PAIRING_TIMEOUT_MS);
+            } else {
+                restartTimer(COMMAND_TIMEOUT_MS);
+            }
             return;
         }
 

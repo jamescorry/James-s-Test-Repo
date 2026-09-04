@@ -26,5 +26,5 @@
     <string id="ScanLooking">Looking for</string>
 
     <string id="PairTitle">Pair</string>
-    <string id="PairInstructions">Tap your key card on the centre console when the car asks.</string>
+    <string id="PairInstructions">Press select, then tap your key card on the centre console. The car shows nothing.</string>
 </strings>

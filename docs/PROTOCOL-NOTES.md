@@ -39,13 +39,18 @@ the SDK actually returns. This is the one interop detail that could not be
 confirmed from documentation and should be checked first when bringing the app
 up against a real vehicle.
 
-## Pairing is unauthenticated
+## Pairing is unauthenticated, and silent
 
 A new key cannot be signed into the whitelist, because no shared secret exists
 until the vehicle already trusts the key. The pairing request is therefore sent
 as an unsigned `RoutableMessage` carrying a `WhitelistOperation`, and the car
-authorises it by asking for a key card tap on the centre console. VCSEC replies
-`OPERATIONSTATUS_WAIT` while it waits for that tap.
+authorises it with a key card tap on the centre console.
+
+**The car displays nothing.** Tesla's spec is explicit that VCSEC replies
+`OPERATIONSTATUS_WAIT` "to indicate it is waiting for the NFC card tap" - there
+is no touchscreen prompt to wait for. Anyone testing this who expects the car
+to ask will conclude, wrongly, that the request never arrived. The watch has to
+be the thing that says "tap now", which is why the pairing screen does.
 
 ## VCSEC quirks worth remembering
 
