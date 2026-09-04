@@ -30,9 +30,12 @@ class BleTransport extends Ble.BleDelegate {
     private const CANDIDATE_MIN_RSSI = -75;
 
     //! How long to let GATT service discovery run before deciding a connected
-    //! device is not a car: eight looks, half a second apart.
+    //! device is not a car. On hardware the car took six to twelve seconds
+    //! just to connect - it negotiates a slow link to save power - and
+    //! discovery over that link is slow in proportion. Four seconds was not
+    //! enough; this allows fifteen.
     private const VERIFY_INTERVAL_MS = 500;
-    private const VERIFY_ATTEMPTS = 8;
+    private const VERIFY_ATTEMPTS = 30;
 
     private var _service as Ble.Uuid;
     private var _writeChar as Ble.Uuid;
@@ -308,7 +311,8 @@ class BleTransport extends Ble.BleDelegate {
 
     function onConnectedStateChanged(device as Ble.Device, state as Ble.ConnectionState) as Void {
         if (state == Ble.CONNECTION_STATE_CONNECTED) {
-            DebugLog.add("connected");
+            var name = device.getName();
+            DebugLog.add("connected" + (name == null ? "" : " " + name));
             _device = device;
             _connecting = false;
             _connected = true;
@@ -369,8 +373,9 @@ class BleTransport extends Ble.BleDelegate {
             return;
         }
 
-        // Discovery has had long enough. This is some other device.
-        DebugLog.add("no vcsec svc, next");
+        // Discovery has had long enough. This is some other device - or the
+        // table is still empty, which the service list below will show.
+        DebugLog.add("no vcsec svc, " + describeServices(device));
         _rejected++;
         _device = null;
         _connected = false;
@@ -381,6 +386,23 @@ class BleTransport extends Ble.BleDelegate {
         }
         notify(:onBleWrongDevice, _rejected);
         resumeScan();
+    }
+
+    //! What the GATT table holds, for the log. Distinguishes a device that
+    //! is not a Tesla (other services present) from discovery that has not
+    //! finished (nothing present at all).
+    private function describeServices(device as Ble.Device) as String {
+        var out = "";
+        var count = 0;
+        var iterator = device.getServices();
+        for (var service = iterator.next(); service != null; service = iterator.next()) {
+            count++;
+            if (count <= 3 && service instanceof Ble.Service) {
+                var text = service.getUuid().toString();
+                out += " " + (text.length() > 8 ? text.substring(0, 8) as String : text);
+            }
+        }
+        return count.toString() + " svcs" + out;
     }
 
     function onDescriptorWrite(descriptor as Ble.Descriptor, status as Ble.Status) as Void {

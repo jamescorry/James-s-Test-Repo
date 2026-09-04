@@ -27,8 +27,9 @@ class CommandManager {
     private const SCAN_TIMEOUT_MS = 45000;
 
     //! Connecting, discovering the GATT table and enabling notifications all
-    //! happen inside this window. A candidate that takes longer is stuck.
-    private const CONNECT_TIMEOUT_MS = 15000;
+    //! happen inside this window. On hardware the car alone took up to twelve
+    //! seconds to connect, and discovery is allowed fifteen more after that.
+    private const CONNECT_TIMEOUT_MS = 35000;
 
     //! A signed command that gets no reply in this window has been lost.
     private const COMMAND_TIMEOUT_MS = 8000;
