@@ -64,6 +64,12 @@ class BleTransport extends Ble.BleDelegate {
     private var _diagnostic as Boolean = false;
     private var _discovered as Array = [];
 
+    // Traffic counters. "No response" cannot distinguish a car that never
+    // heard us from one that replied in a shape we failed to parse.
+    private var _bytesWritten as Number = 0;
+    private var _bytesReceived as Number = 0;
+    private var _messagesReceived as Number = 0;
+
     private var _rxBuffer as ByteArray = []b;
     private var _txChunks as Array = [];
     private var _writeInFlight as Boolean = false;
@@ -174,6 +180,12 @@ class BleTransport extends Ble.BleDelegate {
 
     function isConnected() as Boolean {
         return _device != null;
+    }
+
+    //! Bytes handed to the radio, bytes arriving as notifications, and whole
+    //! framed messages reassembled from them.
+    function getTraffic() as Array<Number> {
+        return [_bytesWritten, _bytesReceived, _messagesReceived];
     }
 
     //! Queue a message for transmission, adding Tesla's length prefix.
@@ -304,6 +316,9 @@ class BleTransport extends Ble.BleDelegate {
 
         if (device.getService(_service) != null) {
             _rejected = 0;
+            _bytesWritten = 0;
+            _bytesReceived = 0;
+            _messagesReceived = 0;
             _rxBuffer = []b;
             _txChunks = [];
             _writeInFlight = false;
@@ -353,6 +368,7 @@ class BleTransport extends Ble.BleDelegate {
         if (!characteristic.getUuid().equals(_readChar)) {
             return;
         }
+        _bytesReceived += value.size();
         _rxBuffer.addAll(value);
         drainMessages();
     }
@@ -516,6 +532,7 @@ class BleTransport extends Ble.BleDelegate {
         _writeInFlight = true;
         try {
             characteristic.requestWrite(chunk, {:writeType => Ble.WRITE_TYPE_WITH_RESPONSE});
+            _bytesWritten += chunk.size();
         } catch (ex) {
             _writeInFlight = false;
             _txChunks = [];
@@ -539,6 +556,7 @@ class BleTransport extends Ble.BleDelegate {
             }
             var message = _rxBuffer.slice(2, length + 2);
             _rxBuffer = _rxBuffer.slice(length + 2, null);
+            _messagesReceived++;
             notify(:onBleMessage, message);
         }
     }

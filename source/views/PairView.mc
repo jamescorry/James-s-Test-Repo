@@ -42,8 +42,23 @@ class PairView extends WatchUi.View {
             body,
             Graphics.FONT_TINY,
             width / 2,
-            height / 2,
+            height * 0.46,
             (width * 0.72).toNumber()
+        );
+
+        // Bytes out, bytes in, whole messages. If tx climbs and rx stays at
+        // zero the car is not answering; if rx climbs while messages stay at
+        // zero it is answering and the framing is wrong.
+        var traffic = _manager.getTraffic();
+        dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(
+            width / 2,
+            height * 0.76,
+            Graphics.FONT_XTINY,
+            "tx " + traffic[0].toString() +
+                "  rx " + traffic[1].toString() +
+                "  msg " + traffic[2].toString(),
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
         );
     }
 }

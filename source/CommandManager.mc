@@ -29,6 +29,11 @@ class CommandManager {
     //! A signed command that gets no reply in this window has been lost.
     private const COMMAND_TIMEOUT_MS = 8000;
 
+    //! Pairing is not a request-response exchange: the car has to show a
+    //! prompt and wait for a key card to be tapped on the console. Eight
+    //! seconds cannot tell a silent car from an unhurried one.
+    private const PAIRING_TIMEOUT_MS = 45000;
+
     private var _transport as BleTransport;
     private var _session as Session?;
     private var _vin as String?;
@@ -147,6 +152,12 @@ class CommandManager {
 
     function getDiscovered() as Array {
         return _transport.getDiscovered();
+    }
+
+    //! [bytes written, bytes received, messages reassembled] on the current
+    //! connection.
+    function getTraffic() as Array<Number> {
+        return _transport.getTraffic();
     }
 
     //! The VIN this app is looking for, and the advertisement name it implies.
@@ -270,7 +281,7 @@ class CommandManager {
         }
         setState(STATE_SENDING, "");
         _transport.send(message);
-        restartTimer(COMMAND_TIMEOUT_MS);
+        restartTimer(_pendingIsPairing ? PAIRING_TIMEOUT_MS : COMMAND_TIMEOUT_MS);
     }
 
     private function onMessage(raw as ByteArray) as Void {
