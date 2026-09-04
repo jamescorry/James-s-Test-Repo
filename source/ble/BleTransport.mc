@@ -68,6 +68,7 @@ class BleTransport extends Ble.BleDelegate {
     // one of four tyre pressure sensors - and the car is never reached.
     private var _rejectedResults as Array = [];
     private var _identifying as Boolean = false;
+    private var _gapRegistered as Boolean = false;
     private var _currentResult as Ble.ScanResult?;
 
     private var _listener;
@@ -127,31 +128,62 @@ class BleTransport extends Ble.BleDelegate {
     //! and Connect IQ allows only a small number of registered profiles.
     function open() as Void {
         Ble.setDelegate(self);
-        Ble.registerProfile({
-            :uuid => _service,
-            :characteristics => [
-                {
-                    :uuid => _readChar,
-                    :descriptors => [Ble.cccdUuid()]
-                },
-                {
-                    :uuid => _writeChar
-                }
-            ]
-        });
-        Ble.registerProfile({
-            :uuid => _gapService,
-            :characteristics => [
-                {
-                    :uuid => _gapDeviceName
-                }
-            ]
-        });
+        try {
+            Ble.registerProfile({
+                :uuid => _service,
+                :characteristics => [
+                    {
+                        :uuid => _readChar,
+                        :descriptors => [Ble.cccdUuid()]
+                    },
+                    {
+                        :uuid => _writeChar
+                    }
+                ]
+            });
+        } catch (ex) {
+            DebugLog.add("! tesla profile: " + describe(ex));
+        }
+
+        // Generic Access is a system service and Connect IQ may refuse to
+        // register a profile for it. Registering it threw on a Fenix 8 Pro
+        // and took the app down, so it is optional: without it, rejected
+        // devices simply go unnamed in the log.
+        try {
+            Ble.registerProfile({
+                :uuid => _gapService,
+                :characteristics => [
+                    {
+                        :uuid => _gapDeviceName
+                    }
+                ]
+            });
+            _gapRegistered = true;
+        } catch (ex) {
+            DebugLog.add("gap profile refused: " + describe(ex));
+        }
     }
 
     function onProfileRegister(uuid as Ble.Uuid, status as Ble.Status) as Void {
-        DebugLog.add("profile " + (uuid.equals(_service) ? "tesla" : "gap") +
-            (status == Ble.STATUS_SUCCESS ? " ok" : " ! status " + status.toString()));
+        try {
+            var which = uuid.equals(_service) ? "tesla" : (uuid.equals(_gapService) ? "gap" : "other");
+            DebugLog.add("profile " + which +
+                (status == Ble.STATUS_SUCCESS ? " ok" : " ! status " + status.toString()));
+        } catch (ex) {
+            DebugLog.add("profile cb: " + describe(ex));
+        }
+    }
+
+    //! Class and message of an exception, for the log.
+    private function describe(ex) as String {
+        var text = "";
+        if (ex has :getErrorMessage) {
+            var message = ex.getErrorMessage();
+            if (message != null) {
+                text = message.toString();
+            }
+        }
+        return text.equals("") ? "exception" : text;
     }
 
     //! Start looking for the car whose VIN hashes to `localName`.
@@ -445,6 +477,9 @@ class BleTransport extends Ble.BleDelegate {
     }
 
     private function readGapName(device as Ble.Device) as Boolean {
+        if (!_gapRegistered) {
+            return false;
+        }
         var service = device.getService(_gapService);
         if (service == null) {
             DebugLog.add("no gap svc");
@@ -512,13 +547,17 @@ class BleTransport extends Ble.BleDelegate {
     private function describeServices(device as Ble.Device) as String {
         var out = "";
         var count = 0;
-        var iterator = device.getServices();
-        for (var service = iterator.next(); service != null; service = iterator.next()) {
-            count++;
-            if (count <= 3 && service instanceof Ble.Service) {
-                var text = service.getUuid().toString();
-                out += " " + (text.length() > 8 ? text.substring(0, 8) as String : text);
+        try {
+            var iterator = device.getServices();
+            for (var service = iterator.next(); service != null; service = iterator.next()) {
+                count++;
+                if (count <= 3 && service instanceof Ble.Service) {
+                    var text = service.getUuid().toString();
+                    out += " " + (text.length() > 8 ? text.substring(0, 8) as String : text);
+                }
             }
+        } catch (ex) {
+            return "svcs threw";
         }
         return count.toString() + " svcs" + out;
     }
@@ -684,8 +723,15 @@ class BleTransport extends Ble.BleDelegate {
             out.put(:hex, "raw n/a");
             return out;
         }
-        var data = result.getRawData();
+        var data = null;
+        try {
+            data = result.getRawData();
+        } catch (ex) {
+            out.put(:hex, "raw threw");
+            return out;
+        }
         if (!(data instanceof ByteArray)) {
+            out.put(:hex, "raw null");
             return out;
         }
         out.put(:hex, hexBytes(data, 8));
