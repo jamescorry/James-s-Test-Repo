@@ -1,12 +1,11 @@
 import Toybox.Lang;
 import Toybox.WatchUi;
 
+//! Back only. Starting and stopping the scan belongs to ScanView, which knows
+//! when it is on screen, so this delegate needs no manager of its own.
 class ScanDelegate extends WatchUi.BehaviorDelegate {
-    private var _manager as CommandManager;
-
-    function initialize(manager as CommandManager) {
+    function initialize() {
         BehaviorDelegate.initialize();
-        _manager = manager;
     }
 
     function onBack() as Boolean {

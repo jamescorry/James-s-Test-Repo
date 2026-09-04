@@ -39,21 +39,25 @@ module TextLayout {
     }
 
     //! Draw text wrapped and centred on a point, growing evenly up and down.
+    //! Coordinates are Numeric rather than Number: screen positions are
+    //! naturally written as a fraction of the display size, which yields a
+    //! Float, and making every call site remember .toNumber() is a compile
+    //! error waiting to happen.
     function drawCentered(
         dc as Dc,
         text as String,
         font as Graphics.FontType,
-        centerX as Number,
-        centerY as Number,
-        maxWidth as Number
+        centerX as Lang.Numeric,
+        centerY as Lang.Numeric,
+        maxWidth as Lang.Numeric
     ) as Void {
-        var lines = wrap(dc, text, font, maxWidth);
+        var lines = wrap(dc, text, font, maxWidth.toNumber());
         var lineHeight = dc.getFontHeight(font);
-        var top = centerY - ((lines.size() - 1) * lineHeight) / 2;
+        var top = centerY.toNumber() - ((lines.size() - 1) * lineHeight) / 2;
 
         for (var i = 0; i < lines.size(); i++) {
             dc.drawText(
-                centerX,
+                centerX.toNumber(),
                 top + i * lineHeight,
                 font,
                 lines[i],

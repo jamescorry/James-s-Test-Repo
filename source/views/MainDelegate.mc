@@ -33,7 +33,7 @@ class MainDelegate extends WatchUi.BehaviorDelegate {
         } else if (action == ACTION_DIAGNOSE) {
             WatchUi.pushView(
                 new ScanView(_manager),
-                new ScanDelegate(_manager),
+                new ScanDelegate(),
                 WatchUi.SLIDE_LEFT
             );
         } else {
