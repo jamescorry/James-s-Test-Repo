@@ -363,9 +363,18 @@ class CommandManager {
 
     //! Public because Timer needs a bound method reference to it.
     function onTimeout() as Void {
+        // Name the phase that timed out. "Car not found" covers three very
+        // different failures - never saw a candidate, could not connect to
+        // one, or connected and found no Tesla service - and telling them
+        // apart from the watch face saves a debugging round trip.
         if (_state == STATE_SCANNING) {
             _transport.stopScan();
-            fail("Car not found");
+            fail(_transport.hasTriedCandidates() ? "No Tesla found" : "No car seen");
+        } else if (_state == STATE_CONNECTING) {
+            _transport.stopScan();
+            fail("Connect failed");
+        } else if (_state == STATE_HANDSHAKE) {
+            fail("No handshake");
         } else {
             fail("No response");
         }

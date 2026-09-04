@@ -29,6 +29,11 @@ class BleTransport extends Ble.BleDelegate {
     //! are standing next to is loud; a neighbour's doorbell is not.
     private const CANDIDATE_MIN_RSSI = -75;
 
+    //! How long to let GATT service discovery run before deciding a connected
+    //! device is not a car: eight looks, half a second apart.
+    private const VERIFY_INTERVAL_MS = 500;
+    private const VERIFY_ATTEMPTS = 8;
+
     private var _service as Ble.Uuid;
     private var _writeChar as Ble.Uuid;
     private var _readChar as Ble.Uuid;
@@ -49,6 +54,12 @@ class BleTransport extends Ble.BleDelegate {
     private var _connecting as Boolean = false;
     private var _rejected as Number = 0;
 
+    // Service discovery finishes some time after the connection reports
+    // itself connected, so the GATT table has to be re-read rather than
+    // trusted on the first look.
+    private var _verifyTimer as Timer.Timer;
+    private var _verifyAttempts as Number = 0;
+
     // Diagnostics: collect what the scan sees instead of connecting to it.
     private var _diagnostic as Boolean = false;
     private var _discovered as Array = [];
@@ -61,6 +72,7 @@ class BleTransport extends Ble.BleDelegate {
         BleDelegate.initialize();
         _listener = listener;
         _scanTimer = new Timer.Timer();
+        _verifyTimer = new Timer.Timer();
         _service = Ble.stringToUuid(SERVICE_UUID);
         _writeChar = Ble.stringToUuid(WRITE_CHAR_UUID);
         _readChar = Ble.stringToUuid(READ_CHAR_UUID);
@@ -107,6 +119,12 @@ class BleTransport extends Ble.BleDelegate {
     }
 
     //! Strongest signal first: standing next to the car, it should lead.
+    //! Whether any candidate was connected to during this scan. Separates
+    //! "never saw anything worth trying" from "tried and none was a Tesla".
+    function hasTriedCandidates() as Boolean {
+        return _rejected > 0;
+    }
+
     function getDiscovered() as Array {
         var sorted = [];
         var remaining = _discovered.slice(0, null);
@@ -260,33 +278,55 @@ class BleTransport extends Ble.BleDelegate {
             _device = device;
             _connecting = false;
 
-            // Identify the car after connecting rather than before. Its
-            // advertisement carries no name that Connect IQ will surface, no
-            // service uuid and no manufacturer data - but the VCSEC service is
-            // always in the GATT table once connected.
-            if (device.getService(_service) == null) {
-                _rejected++;
-                _device = null;
-                try {
-                    Ble.unpairDevice(device);
-                } catch (ex) {
-                    // Nothing useful to do.
-                }
-                notify(:onBleWrongDevice, _rejected);
-                resumeScan();
-                return;
-            }
+            // Identify the car after connecting rather than before, since its
+            // advertisement carries nothing to match on. The GATT table is not
+            // populated the instant the connection reports connected, though,
+            // so give discovery time and look again before giving up.
+            _verifyAttempts = 0;
+            _verifyTimer.stop();
+            _verifyTimer.start(method(:verifyService), VERIFY_INTERVAL_MS, false);
+        } else {
+            _device = null;
+            _connecting = false;
+            _verifyTimer.stop();
+            notify(:onBleDisconnected, null);
+        }
+    }
 
+    //! Look for Tesla's VCSEC service in the connected device's GATT table.
+    //!
+    //! Public because Timer needs a bound method reference to it.
+    function verifyService() as Void {
+        var device = _device;
+        if (device == null) {
+            return;
+        }
+
+        if (device.getService(_service) != null) {
             _rejected = 0;
             _rxBuffer = []b;
             _txChunks = [];
             _writeInFlight = false;
             enableNotifications();
-        } else {
-            _device = null;
-            _connecting = false;
-            notify(:onBleDisconnected, null);
+            return;
         }
+
+        _verifyAttempts++;
+        if (_verifyAttempts < VERIFY_ATTEMPTS) {
+            _verifyTimer.start(method(:verifyService), VERIFY_INTERVAL_MS, false);
+            return;
+        }
+
+        // Discovery has had long enough. This is some other device.
+        _rejected++;
+        _device = null;
+        try {
+            Ble.unpairDevice(device);
+        } catch (ex) {
+            // Nothing useful to do if it has already gone.
+        }
+        notify(:onBleWrongDevice, _rejected);
+        resumeScan();
     }
 
     function onDescriptorWrite(descriptor as Ble.Descriptor, status as Ble.Status) as Void {
