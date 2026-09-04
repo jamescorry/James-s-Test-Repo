@@ -18,6 +18,22 @@ class BleTransport extends Ble.BleDelegate {
     const WRITE_CHAR_UUID = "00000212-b2d1-43f0-9b88-960cebf8b91e";
     const READ_CHAR_UUID = "00000213-b2d1-43f0-9b88-960cebf8b91e";
 
+    //! Generic Access, present on nearly every peripheral. Its Device Name
+    //! characteristic is read from devices that turn out not to carry the
+    //! Tesla service, to learn what the watch actually connected to.
+    const GAP_SERVICE_UUID = "00001800-0000-1000-8000-00805f9b34fb";
+    const GAP_DEVICE_NAME_UUID = "00002a00-0000-1000-8000-00805f9b34fb";
+
+    //! The Tesla service uuid as it appears on air: 128-bit uuids in an
+    //! advertisement are little-endian.
+    private var _teslaUuidLe as ByteArray;
+
+    // Advertisement data types, Bluetooth Core Specification Supplement.
+    private const AD_INCOMPLETE_128BIT_UUIDS = 0x06;
+    private const AD_COMPLETE_128BIT_UUIDS = 0x07;
+    private const AD_SHORT_NAME = 0x08;
+    private const AD_COMPLETE_NAME = 0x09;
+
     //! Connect IQ's per-write payload limit.
     private const CHUNK_SIZE = 20;
 
@@ -35,11 +51,24 @@ class BleTransport extends Ble.BleDelegate {
     //! discovery over that link is slow in proportion. Four seconds was not
     //! enough; this allows fifteen.
     private const VERIFY_INTERVAL_MS = 500;
-    private const VERIFY_ATTEMPTS = 30;
+    private const VERIFY_ATTEMPTS = 20;
+
+    //! How long to wait for a rejected device to answer a name read before
+    //! moving on without one.
+    private const IDENTIFY_TIMEOUT_MS = 4000;
 
     private var _service as Ble.Uuid;
     private var _writeChar as Ble.Uuid;
     private var _readChar as Ble.Uuid;
+    private var _gapService as Ble.Uuid;
+    private var _gapDeviceName as Ble.Uuid;
+
+    // Devices already connected to and found not to be a car. Without this
+    // the scan keeps handing back the loudest of them - in a Tesla, that is
+    // one of four tyre pressure sensors - and the car is never reached.
+    private var _rejectedResults as Array = [];
+    private var _identifying as Boolean = false;
+    private var _currentResult as Ble.ScanResult?;
 
     private var _listener;
     private var _targetName as String?;
@@ -86,6 +115,12 @@ class BleTransport extends Ble.BleDelegate {
         _service = Ble.stringToUuid(SERVICE_UUID);
         _writeChar = Ble.stringToUuid(WRITE_CHAR_UUID);
         _readChar = Ble.stringToUuid(READ_CHAR_UUID);
+        _gapService = Ble.stringToUuid(GAP_SERVICE_UUID);
+        _gapDeviceName = Ble.stringToUuid(GAP_DEVICE_NAME_UUID);
+        _teslaUuidLe = [
+            0x1e, 0xb9, 0xf8, 0xeb, 0x0c, 0x96, 0x88, 0x9b,
+            0xf0, 0x43, 0xd1, 0xb2, 0x11, 0x02, 0x00, 0x00
+        ]b;
     }
 
     //! Register the Tesla GATT profile. Must be called once, before scanning,
@@ -104,12 +139,26 @@ class BleTransport extends Ble.BleDelegate {
                 }
             ]
         });
+        Ble.registerProfile({
+            :uuid => _gapService,
+            :characteristics => [
+                {
+                    :uuid => _gapDeviceName
+                }
+            ]
+        });
+    }
+
+    function onProfileRegister(uuid as Ble.Uuid, status as Ble.Status) as Void {
+        DebugLog.add("profile " + (uuid.equals(_service) ? "tesla" : "gap") +
+            (status == Ble.STATUS_SUCCESS ? " ok" : " ! status " + status.toString()));
     }
 
     //! Start looking for the car whose VIN hashes to `localName`.
     function startScan(localName as String) as Void {
         _targetName = localName;
         _scanDesired = true;
+        _rejectedResults = [];
         if (_scanning) {
             return;
         }
@@ -227,7 +276,9 @@ class BleTransport extends Ble.BleDelegate {
         _device = null;
         _connecting = false;
         _connected = false;
+        _identifying = false;
         _rejected = 0;
+        _rejectedResults = [];
         if (device != null) {
             DebugLog.add("ble close");
             try {
@@ -294,9 +345,12 @@ class BleTransport extends Ble.BleDelegate {
             if (isCandidate(result)) {
                 pauseScan();
                 _connecting = true;
+                var adv = parseAdvertisement(result);
                 DebugLog.add("try " + result.getRssi().toString() +
-                    (matches(result) ? " match" : " nameless"));
+                    (matches(result) ? " match" : " nameless") +
+                    " adv " + (adv.get(:hex) as String));
                 try {
+                    _currentResult = result;
                     _device = Ble.pairDevice(result);
                     notify(:onBleConnecting, null);
                 } catch (ex) {
@@ -377,12 +431,76 @@ class BleTransport extends Ble.BleDelegate {
         // table is still empty, which the service list below will show.
         DebugLog.add("no vcsec svc, " + describeServices(device));
         _rejected++;
-        _device = null;
         _connected = false;
+
+        // Ask the device what it is before letting go of it. The answer
+        // says whether the scan is picking the wrong devices or the right
+        // one is failing discovery.
+        if (readGapName(device)) {
+            _identifying = true;
+            _verifyTimer.start(method(:abandonIdentify), IDENTIFY_TIMEOUT_MS, false);
+            return;
+        }
+        finishRejection();
+    }
+
+    private function readGapName(device as Ble.Device) as Boolean {
+        var service = device.getService(_gapService);
+        if (service == null) {
+            DebugLog.add("no gap svc");
+            return false;
+        }
+        var characteristic = service.getCharacteristic(_gapDeviceName);
+        if (characteristic == null) {
+            DebugLog.add("no gap name char");
+            return false;
+        }
         try {
-            Ble.unpairDevice(device);
+            characteristic.requestRead();
+            return true;
         } catch (ex) {
-            // Nothing useful to do if it has already gone.
+            DebugLog.add("gap read threw");
+            return false;
+        }
+    }
+
+    function onCharacteristicRead(characteristic as Ble.Characteristic, status as Ble.Status, value as ByteArray) as Void {
+        if (!_identifying) {
+            return;
+        }
+        if (status == Ble.STATUS_SUCCESS) {
+            DebugLog.add("it is: " + asText(value));
+        } else {
+            DebugLog.add("gap read status " + status.toString());
+        }
+        finishRejection();
+    }
+
+    //! Public because Timer needs a bound method reference to it.
+    function abandonIdentify() as Void {
+        if (_identifying) {
+            DebugLog.add("gap read timed out");
+            finishRejection();
+        }
+    }
+
+    //! Drop a device that is not a car and go back to scanning, remembering
+    //! it so the scan does not hand it straight back.
+    private function finishRejection() as Void {
+        _identifying = false;
+        _verifyTimer.stop();
+        if (_currentResult != null && _rejectedResults.size() < 8) {
+            _rejectedResults.add(_currentResult);
+        }
+        _currentResult = null;
+        var device = _device;
+        _device = null;
+        if (device != null) {
+            try {
+                Ble.unpairDevice(device);
+            } catch (ex) {
+                // Nothing useful to do if it has already gone.
+            }
         }
         notify(:onBleWrongDevice, _rejected);
         resumeScan();
@@ -446,11 +564,15 @@ class BleTransport extends Ble.BleDelegate {
     //! the strongest signal per name and caps the list, since a busy area
     //! produces far more devices than a watch can show or hold.
     private function record(result as Ble.ScanResult) as Void {
+        var adv = parseAdvertisement(result);
         var name = result.getDeviceName();
+        if (name == null) {
+            name = adv.get(:name) as String?;
+        }
         var label = (name == null) ? "(no name)" : name;
         var rssi = result.getRssi();
 
-        var advertisesTesla = false;
+        var advertisesTesla = adv.get(:tesla) as Boolean;
         var uuids = result.getServiceUuids();
         for (var uuid = uuids.next(); uuid != null; uuid = uuids.next()) {
             if (uuid.equals(_service)) {
@@ -477,6 +599,11 @@ class BleTransport extends Ble.BleDelegate {
                 manufacturer += " " + hexBytes(payload, 4);
             }
             break;
+        }
+        // With nothing else to show, show the advertisement itself. Two
+        // devices that differ only in their payload get separate rows.
+        if (manufacturer.equals("")) {
+            manufacturer = adv.get(:hex) as String;
         }
 
         // Key on name AND manufacturer data, not name alone. Unnamed devices
@@ -528,7 +655,84 @@ class BleTransport extends Ble.BleDelegate {
         if (result.getRssi() < CANDIDATE_MIN_RSSI) {
             return false;
         }
-        return result.getManufacturerSpecificDataIterator().next() == null;
+        if (result.getManufacturerSpecificDataIterator().next() != null) {
+            return false;
+        }
+        return !wasRejected(result);
+    }
+
+    private function wasRejected(result as Ble.ScanResult) as Boolean {
+        if (!(result has :isSameDevice)) {
+            return false;
+        }
+        for (var i = 0; i < _rejectedResults.size(); i++) {
+            if (result.isSameDevice(_rejectedResults[i] as Ble.ScanResult)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    //! Read the advertisement bytes directly. Connect IQ's own parsing did
+    //! not surface the car's name or service uuid on hardware, and the
+    //! bytes themselves say whether they were ever there to surface.
+    //!
+    //! Returns {:name, :tesla, :hex}; hex is the first bytes of the payload.
+    private function parseAdvertisement(result as Ble.ScanResult) as Dictionary {
+        var out = {:name => null, :tesla => false, :hex => ""};
+        if (!(result has :getRawData)) {
+            out.put(:hex, "raw n/a");
+            return out;
+        }
+        var data = result.getRawData();
+        if (!(data instanceof ByteArray)) {
+            return out;
+        }
+        out.put(:hex, hexBytes(data, 8));
+
+        var i = 0;
+        while (i < data.size()) {
+            var length = data[i];
+            if (length == 0 || i + 1 + length > data.size()) {
+                break;
+            }
+            var type = data[i + 1];
+            var start = i + 2;
+            var end = i + 1 + length;
+            if (type == AD_INCOMPLETE_128BIT_UUIDS || type == AD_COMPLETE_128BIT_UUIDS) {
+                for (var j = start; j + 16 <= end; j += 16) {
+                    if (bytesAt(data, j, _teslaUuidLe)) {
+                        out.put(:tesla, true);
+                    }
+                }
+            } else if (type == AD_SHORT_NAME || type == AD_COMPLETE_NAME) {
+                out.put(:name, asText(data.slice(start, end)));
+            }
+            i = end;
+        }
+        return out;
+    }
+
+    private function bytesAt(data as ByteArray, offset as Number, expected as ByteArray) as Boolean {
+        if (offset + expected.size() > data.size()) {
+            return false;
+        }
+        for (var i = 0; i < expected.size(); i++) {
+            if (data[offset + i] != expected[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    //! Printable ASCII from bytes; anything else becomes a dot.
+    private function asText(data as ByteArray) as String {
+        var out = "";
+        for (var i = 0; i < data.size() && i < 24; i++) {
+            var b = data[i];
+            out += (b >= 0x20 && b < 0x7f) ? b.toChar().toString() : ".";
+        }
+        return out;
     }
 
     //! Prefer an exact local-name match, which identifies one specific VIN.
@@ -536,7 +740,14 @@ class BleTransport extends Ble.BleDelegate {
     //! fall back to any device advertising Tesla's service UUID - the wrong car
     //! would fail the personalised handshake anyway.
     private function matches(result as Ble.ScanResult) as Boolean {
+        var adv = parseAdvertisement(result);
+        if (adv.get(:tesla) as Boolean) {
+            return true;
+        }
         var name = result.getDeviceName();
+        if (name == null) {
+            name = adv.get(:name) as String?;
+        }
         if (name != null && _targetName != null) {
             // Tesla's spec gives the name with lower-case hex, but a real car
             // was observed advertising it upper-case. Compare without case.
