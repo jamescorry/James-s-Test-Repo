@@ -6,6 +6,13 @@ import Toybox.Lang;
 //! VCSEC is reachable over BLE even when the infotainment computer is asleep,
 //! which is what makes a watch key practical.
 module Vcsec {
+    // ToVCSECMessage / SignedMessage fields. This is the framing that predates
+    // RoutableMessage, and the whitelist request still uses it.
+    const FIELD_SIGNED_MESSAGE = 1;
+    const FIELD_PROTOBUF_MESSAGE_AS_BYTES = 2;
+    const FIELD_SIGNATURE_TYPE = 3;
+    const SIGNATURE_TYPE_PRESENT_KEY = 2;
+
     // UnsignedMessage fields
     const FIELD_INFORMATION_REQUEST = 1;
     const FIELD_RKE_ACTION = 2;
@@ -56,6 +63,10 @@ module Vcsec {
 
     // CommandStatus fields
     const FIELD_OPERATION_STATUS = 1;
+    const FIELD_WHITELIST_OPERATION_STATUS = 3;
+
+    // WhitelistOperation_status fields
+    const FIELD_WHITELIST_INFORMATION = 1;
 
     // OperationStatus_E
     const OPERATIONSTATUS_OK = 0;
@@ -94,9 +105,9 @@ module Vcsec {
 
     //! Request that this watch's public key be added to the vehicle whitelist.
     //!
-    //! Sent unsigned: the car authorises it by asking for a key card tap on the
-    //! centre console, which is the only trust anchor available before a shared
-    //! secret exists.
+    //! The car authorises it with a key card tap on the centre console, which
+    //! is the only trust anchor available before a shared secret exists. Wrap
+    //! the result in presentKeyEnvelope before sending.
     function addKeyRequest(publicKey as ByteArray, role as Number) as ByteArray {
         var key = Protobuf.bytes(1, publicKey);
 
@@ -111,6 +122,46 @@ module Vcsec {
         operation.addAll(Protobuf.bytes(FIELD_METADATA_FOR_KEY, metadata));
 
         return Protobuf.bytes(FIELD_WHITELIST_OPERATION, operation);
+    }
+
+    //! Wrap an UnsignedMessage in a ToVCSECMessage claiming key-card presence.
+    //!
+    //! Tesla's reference client sends the whitelist request this way - as a
+    //! bare ToVCSECMessage written straight to the characteristic, not inside
+    //! a RoutableMessage. The car ignores the request in any other framing,
+    //! and its replies to this one come back as bare FromVCSECMessages.
+    function presentKeyEnvelope(unsigned as ByteArray) as ByteArray {
+        var signed = []b;
+        signed.addAll(Protobuf.bytes(FIELD_PROTOBUF_MESSAGE_AS_BYTES, unsigned));
+        signed.addAll(Protobuf.uint(FIELD_SIGNATURE_TYPE, SIGNATURE_TYPE_PRESENT_KEY));
+        return Protobuf.bytes(FIELD_SIGNED_MESSAGE, signed);
+    }
+
+    //! The whitelist-specific reason code in a command status, or 0 when the
+    //! car gave none. Non-zero explains why a pairing was refused.
+    function whitelistInformationOf(payload as ByteArray) as Number {
+        var message = Protobuf.decode(payload);
+        var status = Protobuf.submessage(message, FIELD_COMMAND_STATUS);
+        var whitelist = Protobuf.submessage(status, FIELD_WHITELIST_OPERATION_STATUS);
+        return Protobuf.numberOf(whitelist, FIELD_WHITELIST_INFORMATION, 0);
+    }
+
+    //! Short text for the whitelist reason codes a watch can plausibly hit.
+    function whitelistInformationText(code as Number) as String {
+        if (code == 3 || code == 4) {
+            return "Key list full";
+        } else if (code == 5 || code == 8) {
+            return "Not permitted";
+        } else if (code == 6) {
+            return "Bad key";
+        } else if (code == 13) {
+            return "Already paired";
+        } else if (code == 14) {
+            return "Tap card first";
+        } else if (code == 19 || code == 20) {
+            return "Bad role";
+        }
+        return "Pair error " + code.toString();
     }
 
     //! Pull the lock state out of a FromVCSECMessage, or null if the message

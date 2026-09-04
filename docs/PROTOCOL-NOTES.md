@@ -39,18 +39,40 @@ the SDK actually returns. This is the one interop detail that could not be
 confirmed from documentation and should be checked first when bringing the app
 up against a real vehicle.
 
-## Pairing is unauthenticated, and silent
+## Pairing uses the old framing, not RoutableMessage
 
 A new key cannot be signed into the whitelist, because no shared secret exists
-until the vehicle already trusts the key. The pairing request is therefore sent
-as an unsigned `RoutableMessage` carrying a `WhitelistOperation`, and the car
-authorises it with a key card tap on the centre console.
+until the vehicle already trusts the key. Tesla's reference client
+(`SendAddKeyRequestWithRole` in `pkg/vehicle/security.go`) therefore does not
+use the `RoutableMessage` envelope at all for this one request. It writes a
+bare `ToVCSECMessage` straight to the characteristic:
 
-**The car displays nothing.** Tesla's spec is explicit that VCSEC replies
-`OPERATIONSTATUS_WAIT` "to indicate it is waiting for the NFC card tap" - there
-is no touchscreen prompt to wait for. Anyone testing this who expects the car
-to ask will conclude, wrongly, that the request never arrived. The watch has to
-be the thing that says "tap now", which is why the pairing screen does.
+```
+ToVCSECMessage {
+  signedMessage (1) {
+    protobufMessageAsBytes (2) = UnsignedMessage { WhitelistOperation (16) {...} }
+    signatureType (3)          = SIGNATURE_TYPE_PRESENT_KEY (2)
+  }
+}
+```
+
+This app's first version wrapped the same `WhitelistOperation` in an unsigned
+`RoutableMessage`, and the car never answered. That is the expected outcome:
+VCSEC has no unsigned path through the envelope. `Vcsec.presentKeyEnvelope`
+builds the bare form now.
+
+Replies to it come back the same way - as bare `FromVCSECMessage`s rather than
+inside an envelope. `CommandManager.onMessage` tells the two apart by the
+fields present: `FromVCSECMessage` reserves 6 to 10, which is exactly where
+`RoutableMessage` keeps its addressing and payload, so there is no overlap.
+
+**What the car does.** Tesla's docs: the user must approve "by tapping their
+NFC card on the center console and then confirming their intent on the
+vehicle UI". Nothing appears on the car until the card is tapped; the
+confirmation prompt follows the tap. VCSEC replies `OPERATIONSTATUS_WAIT`
+while it waits, which the watch shows as "Tap key card now". A refusal
+carries a `WhitelistOperation_status.whitelistOperationInformation` code -
+`Vcsec.whitelistInformationText` names the ones a watch can hit.
 
 ## VCSEC quirks worth remembering
 

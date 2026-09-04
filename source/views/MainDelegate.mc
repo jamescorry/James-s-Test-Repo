@@ -36,6 +36,8 @@ class MainDelegate extends WatchUi.BehaviorDelegate {
                 new ScanDelegate(),
                 WatchUi.SLIDE_LEFT
             );
+        } else if (action == ACTION_LOG) {
+            WatchUi.pushView(new LogView(), new LogDelegate(), WatchUi.SLIDE_LEFT);
         } else {
             _manager.sendCommand(Vcsec.rkeAction(Vcsec.RKE_ACTION_UNLOCK));
         }

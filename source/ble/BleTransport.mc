@@ -52,6 +52,7 @@ class BleTransport extends Ble.BleDelegate {
     // A connection attempt in progress. Scanning is paused for it, and must
     // not be restarted underneath it by the keep-alive.
     private var _connecting as Boolean = false;
+    private var _connected as Boolean = false;
     private var _rejected as Number = 0;
 
     // Service discovery finishes some time after the connection reports
@@ -178,8 +179,10 @@ class BleTransport extends Ble.BleDelegate {
         }
     }
 
+    //! True only once the link is actually up. pairDevice hands back a Device
+    //! before the connection completes, so holding a handle proves nothing.
     function isConnected() as Boolean {
-        return _device != null;
+        return _connected && _device != null;
     }
 
     //! Bytes handed to the radio, bytes arriving as notifications, and whole
@@ -197,6 +200,7 @@ class BleTransport extends Ble.BleDelegate {
 
         var framed = [(message.size() >> 8) & 0xFF, message.size() & 0xFF]b;
         framed.addAll(message);
+        DebugLog.add("tx " + message.size().toString() + "b " + DebugLog.hex(message, 4));
 
         for (var offset = 0; offset < framed.size(); offset += CHUNK_SIZE) {
             var end = offset + CHUNK_SIZE;
@@ -208,15 +212,26 @@ class BleTransport extends Ble.BleDelegate {
         pumpWrites();
     }
 
+    //! Tear everything down, including a connection attempt that never
+    //! completed. Every failure path ends here so the next attempt starts
+    //! from nothing rather than from whatever the last one left behind.
     function close() as Void {
         stopScan();
-        if (_device != null) {
+        _verifyTimer.stop();
+        // Flags first: unpairing produces a disconnect callback, which must
+        // read as our own doing rather than as the car dropping the link.
+        var device = _device;
+        _device = null;
+        _connecting = false;
+        _connected = false;
+        _rejected = 0;
+        if (device != null) {
+            DebugLog.add("ble close");
             try {
-                Ble.unpairDevice(_device);
+                Ble.unpairDevice(device);
             } catch (ex) {
                 // Nothing useful to do if the device has already gone.
             }
-            _device = null;
         }
         _rxBuffer = []b;
         _txChunks = [];
@@ -227,6 +242,9 @@ class BleTransport extends Ble.BleDelegate {
 
     function onScanStateChange(scanState as Ble.ScanState, status as Ble.Status) as Void {
         _scanning = (scanState == Ble.SCAN_STATE_SCANNING);
+        if (status != Ble.STATUS_SUCCESS) {
+            DebugLog.add("! scan status " + status.toString());
+        }
 
         // Scanning stopping while it is still wanted is normal, not an error.
         // Restart it, or a slowly advertising car is never seen.
@@ -273,11 +291,14 @@ class BleTransport extends Ble.BleDelegate {
             if (isCandidate(result)) {
                 pauseScan();
                 _connecting = true;
+                DebugLog.add("try " + result.getRssi().toString() +
+                    (matches(result) ? " match" : " nameless"));
                 try {
                     _device = Ble.pairDevice(result);
                     notify(:onBleConnecting, null);
                 } catch (ex) {
                     _connecting = false;
+                    DebugLog.add("! pairDevice threw");
                     notify(:onBleError, "Could not connect");
                 }
                 return;
@@ -287,8 +308,10 @@ class BleTransport extends Ble.BleDelegate {
 
     function onConnectedStateChanged(device as Ble.Device, state as Ble.ConnectionState) as Void {
         if (state == Ble.CONNECTION_STATE_CONNECTED) {
+            DebugLog.add("connected");
             _device = device;
             _connecting = false;
+            _connected = true;
 
             // Identify the car after connecting rather than before, since its
             // advertisement carries nothing to match on. The GATT table is not
@@ -298,10 +321,23 @@ class BleTransport extends Ble.BleDelegate {
             _verifyTimer.stop();
             _verifyTimer.start(method(:verifyService), VERIFY_INTERVAL_MS, false);
         } else {
+            // Three things look like a disconnect: the car dropping a live
+            // link, a connection attempt that never came up, and our own
+            // unpairing of a rejected device. Only the first two need acting
+            // on, and differently.
+            var wasConnected = _connected;
+            var wasConnecting = _connecting;
             _device = null;
             _connecting = false;
+            _connected = false;
             _verifyTimer.stop();
-            notify(:onBleDisconnected, null);
+            if (wasConnected) {
+                DebugLog.add("disconnected");
+                notify(:onBleDisconnected, null);
+            } else if (wasConnecting) {
+                DebugLog.add("connect failed, rescan");
+                resumeScan();
+            }
         }
     }
 
@@ -315,6 +351,7 @@ class BleTransport extends Ble.BleDelegate {
         }
 
         if (device.getService(_service) != null) {
+            DebugLog.add("vcsec svc after " + (_verifyAttempts + 1).toString());
             _rejected = 0;
             _bytesWritten = 0;
             _bytesReceived = 0;
@@ -333,8 +370,10 @@ class BleTransport extends Ble.BleDelegate {
         }
 
         // Discovery has had long enough. This is some other device.
+        DebugLog.add("no vcsec svc, next");
         _rejected++;
         _device = null;
+        _connected = false;
         try {
             Ble.unpairDevice(device);
         } catch (ex) {
@@ -348,8 +387,10 @@ class BleTransport extends Ble.BleDelegate {
         // Notifications are live, so the vehicle can now reply. Only at this
         // point is the link actually usable.
         if (status == Ble.STATUS_SUCCESS) {
+            DebugLog.add("notify on");
             notify(:onBleConnected, null);
         } else {
+            DebugLog.add("! cccd status " + status.toString());
             notify(:onBleError, "Link setup failed");
         }
     }
@@ -358,8 +399,12 @@ class BleTransport extends Ble.BleDelegate {
         _writeInFlight = false;
         if (status != Ble.STATUS_SUCCESS) {
             _txChunks = [];
+            DebugLog.add("! write status " + status.toString());
             notify(:onBleError, "Send failed");
             return;
+        }
+        if (_txChunks.size() == 0) {
+            DebugLog.add("tx done");
         }
         pumpWrites();
     }
@@ -487,17 +532,20 @@ class BleTransport extends Ble.BleDelegate {
     private function enableNotifications() as Void {
         var characteristic = readCharacteristic();
         if (characteristic == null) {
+            DebugLog.add("! no read char");
             notify(:onBleError, "Tesla service missing");
             return;
         }
         var descriptor = characteristic.getDescriptor(Ble.cccdUuid());
         if (descriptor == null) {
+            DebugLog.add("! no cccd");
             notify(:onBleError, "Tesla service missing");
             return;
         }
         try {
             descriptor.requestWrite([0x01, 0x00]b);
         } catch (ex) {
+            DebugLog.add("! cccd write threw");
             notify(:onBleError, "Link setup failed");
         }
     }
@@ -536,6 +584,7 @@ class BleTransport extends Ble.BleDelegate {
         } catch (ex) {
             _writeInFlight = false;
             _txChunks = [];
+            DebugLog.add("! write threw");
             notify(:onBleError, "Send failed");
         }
     }
@@ -547,6 +596,7 @@ class BleTransport extends Ble.BleDelegate {
             if (length > MAX_MESSAGE_SIZE) {
                 // The stream is out of step with the framing; there is no way
                 // to resynchronise mid-stream, so start over.
+                DebugLog.add("! bad frame " + DebugLog.hex(_rxBuffer, 4));
                 _rxBuffer = []b;
                 notify(:onBleError, "Bad response");
                 return;
@@ -557,6 +607,7 @@ class BleTransport extends Ble.BleDelegate {
             var message = _rxBuffer.slice(2, length + 2);
             _rxBuffer = _rxBuffer.slice(length + 2, null);
             _messagesReceived++;
+            DebugLog.add("rx " + length.toString() + "b " + DebugLog.hex(message, 6));
             notify(:onBleMessage, message);
         }
     }

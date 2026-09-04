@@ -9,6 +9,7 @@ enum Action {
     ACTION_TRUNK,
     ACTION_FRUNK,
     ACTION_DIAGNOSE,
+    ACTION_LOG,
     ACTION_COUNT
 }
 
@@ -69,7 +70,7 @@ class MainView extends WatchUi.View {
         drawSelectionDots(dc, width, height);
     }
 
-    //! Four dots showing which action is selected - cheaper to read at a
+    //! One dot per action showing which action is selected - cheaper to read at a
     //! glance than a scrolling list, and it fits a round screen.
     private function drawSelectionDots(dc as Dc, width as Number, height as Number) as Void {
         var spacing = 16;
@@ -97,6 +98,8 @@ class MainView extends WatchUi.View {
             return WatchUi.loadResource(Rez.Strings.CmdFrunk) as String;
         } else if (action == ACTION_DIAGNOSE) {
             return WatchUi.loadResource(Rez.Strings.CmdDiagnose) as String;
+        } else if (action == ACTION_LOG) {
+            return WatchUi.loadResource(Rez.Strings.CmdLog) as String;
         }
         return WatchUi.loadResource(Rez.Strings.CmdUnlock) as String;
     }

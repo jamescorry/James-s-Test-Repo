@@ -174,6 +174,47 @@ if shared is not None:
         "996c1fe38331be138f8039c194b14db2198846ed7d8251e6749284d7b32ea002",
     )
 
+# --- mirrors Vcsec.addKeyRequest + presentKeyEnvelope ---
+#
+# No published vector exists for the pairing request, so this pins the field
+# layout to vcsec.proto and to SendAddKeyRequestWithRole in Tesla's Go client,
+# which sends a bare ToVCSECMessage rather than a RoutableMessage.
+
+def varint(value):
+    out = b""
+    while True:
+        byte = value & 0x7F
+        value >>= 7
+        out += bytes([byte | 0x80 if value else byte])
+        if not value:
+            return out
+
+
+def pb_bytes(field, value):
+    return varint((field << 3) | 2) + varint(len(value)) + value
+
+
+def pb_uint(field, value):
+    return varint((field << 3) | 0) + varint(value)
+
+
+print("\nPairing request framing")
+public_key = bytes([0x04]) + bytes(range(64))
+permission_change = pb_bytes(1, pb_bytes(1, public_key)) + pb_uint(4, 3)          # key, ROLE_DRIVER
+operation = pb_bytes(5, permission_change) + pb_bytes(6, pb_uint(1, 7))           # add+perms, ANDROID_DEVICE
+unsigned = pb_bytes(16, operation)                                                 # UnsignedMessage.WhitelistOperation
+envelope = pb_bytes(1, pb_bytes(2, unsigned) + pb_uint(3, 2))                      # ToVCSECMessage.signedMessage{bytes, PRESENT_KEY}
+
+check("envelope starts with signedMessage tag", envelope[0], 0x0A)
+check("signedMessage carries protobufMessageAsBytes (field 2)", envelope[2], 0x12)
+check("signatureType is PRESENT_KEY (2)", envelope[-2:], bytes([0x18, 0x02]))
+check("UnsignedMessage uses WhitelistOperation field 16 (two-byte tag)", unsigned[:2].hex(), "8201")
+decoded = decode(envelope)
+check("envelope decodes to a single field 1", sorted(decoded), [1])
+inner = decode(decoded[1])
+check("inner fields are 2 and 3", sorted(inner), [2, 3])
+check("inner field 3 value", inner[3], 2)
+
 print("\nBLE advertisement name")
 digest = hashlib.sha1(b"5YJS0000000000000").digest()[:8]
 check("local name for VIN 5YJS0000000000000", "S" + digest.hex() + "C", "S1a87a5a75f3df858C")

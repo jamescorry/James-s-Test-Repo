@@ -20,11 +20,15 @@
     <string id="CmdFrunk">Frunk</string>
 
     <string id="CmdDiagnose">Diagnose</string>
+    <string id="CmdLog">Log</string>
+
+    <string id="LogTitle">Event log</string>
+    <string id="LogEmpty">Nothing yet</string>
 
     <string id="ScanTitle">Nearby BLE</string>
     <string id="ScanEmpty">Nothing seen yet</string>
     <string id="ScanLooking">Looking for</string>
 
     <string id="PairTitle">Pair</string>
-    <string id="PairInstructions">Press select, then tap your key card on the centre console. The car shows nothing.</string>
+    <string id="PairInstructions">Press select, tap your key card on the centre console, then confirm on the car screen.</string>
 </strings>

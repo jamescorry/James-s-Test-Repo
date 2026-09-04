@@ -189,7 +189,20 @@ It greys out when no app is running, so open it with the app on screen.
    to recognise the car's BLE advertisement and to personalise signatures. No
    network access is used at any point.
 2. Open the app, press menu, and select pair.
-3. Tap the key card on the centre console when the car asks.
+3. Tap the key card on the centre console. The car shows nothing until you
+   do; once it reads the card it asks you to confirm the new key on screen.
+4. The watch says "Paired", then hand-shakes. "Connected" on the main screen
+   is the proof the key is on the whitelist.
+
+## Debugging on the watch
+
+There is no console, so the app keeps its own event log. From the main
+screen, scroll to **Log** and press select: every BLE callback, state change,
+message sent and message received is there with a timestamp, newest at the
+bottom, up/down to scroll. Lines starting with `!` ended an attempt; `rx` and
+`car:` lines are the car talking. The pairing screen shows the last three
+lines and the byte counters (`tx`, `rx`, `msg`) live, so an attempt can be
+read as it happens. **Diagnose** lists the advertisements the scan can see.
 
 ## What still needs doing
 
