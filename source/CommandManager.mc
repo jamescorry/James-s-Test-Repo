@@ -42,6 +42,7 @@ class CommandManager {
     private var _transport as BleTransport;
     private var _session as Session?;
     private var _vin as String?;
+    private var _bleAddress as String?;
     private var _routingAddress as ByteArray;
     private var _lastUuid as ByteArray;
 
@@ -96,10 +97,21 @@ class CommandManager {
     //! settings change on the phone.
     function reloadVin() as Void {
         var vin = null;
+        var address = null;
         try {
             vin = Properties.getValue("Vin");
+            address = Properties.getValue("BleAddress");
         } catch (ex) {
             vin = null;
+            address = null;
+        }
+        _bleAddress = null;
+        if (address instanceof String) {
+            var normalized = address.toUpper();
+            if (normalized.length() > 0) {
+                _bleAddress = normalized;
+                DebugLog.add("ble addr " + normalized);
+            }
         }
         if (vin instanceof String && vin.length() == 17) {
             vin = vin.toUpper();
@@ -186,6 +198,12 @@ class CommandManager {
             // progress rather than a hang, and give the scan its window back.
             setState(STATE_SCANNING, "Checking " + argument.toString());
             restartTimer(SCAN_TIMEOUT_MS);
+        } else if (event == :onBleRetry) {
+            // A failed pair attempt must not consume the entire scan window.
+            // BleTransport has already dropped the peripheral and resumed the
+            // scan; keep the manager in the matching state while it does so.
+            setState(STATE_SCANNING, "Trying next device");
+            restartTimer(SCAN_TIMEOUT_MS);
         } else if (event == :onBleScanChanged) {
             // Nothing to decide, just show what arrived.
             if (_onChange != null) {
@@ -238,7 +256,7 @@ class CommandManager {
         }
 
         setState(STATE_SCANNING, "");
-        _transport.startScan(CryptoUtils.bleLocalName(_vin));
+        _transport.startScan(CryptoUtils.bleLocalName(_vin), _bleAddress);
         restartTimer(SCAN_TIMEOUT_MS);
     }
 
@@ -453,7 +471,12 @@ class CommandManager {
         if (_state == STATE_SCANNING) {
             fail(_transport.hasTriedCandidates() ? "No Tesla found" : "No car seen");
         } else if (_state == STATE_CONNECTING) {
-            fail("Connect failed");
+            // pairDevice can leave a peripheral in limbo for longer than the
+            // manager's window. Drop that handle and let the transport try the
+            // next scan result before declaring failure.
+            _transport.retryConnection();
+            setState(STATE_SCANNING, "Trying next device");
+            restartTimer(SCAN_TIMEOUT_MS);
         } else if (_state == STATE_HANDSHAKE) {
             fail("No handshake");
         } else {

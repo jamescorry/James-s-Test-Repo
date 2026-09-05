@@ -92,7 +92,7 @@ class ScanView extends WatchUi.View {
 
             // Green when this advertisement is one the app would connect to,
             // blue when it carries Tesla's service uuid but did not match.
-            if (entry.get(:matches) as Boolean) {
+            if (entry.get(:isMatch) as Boolean) {
                 dc.setColor(Graphics.COLOR_GREEN, Graphics.COLOR_TRANSPARENT);
             } else if (entry.get(:tesla) as Boolean) {
                 dc.setColor(Graphics.COLOR_BLUE, Graphics.COLOR_TRANSPARENT);

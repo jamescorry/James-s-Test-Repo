@@ -37,25 +37,38 @@ module CryptoUtils {
         return encodePublic(keyPair().getPublicKey().getBytes());
     }
 
-    //! Tesla encodes public keys uncompressed: 0x04 || X || Y, 65 bytes.
-    //! Connect IQ works in the bare X || Y form, so the prefix is added here.
-    //! Both lengths are accepted so the app survives either representation.
+    //! Tesla encodes public keys as 0x04 || BIG_ENDIAN(X) || BIG_ENDIAN(Y).
+    //! Garmin's Cryptography API uses bare X || Y values in little-endian
+    //! byte order (the API's ECDH example calls this out explicitly), so both
+    //! coordinates must be reversed at this boundary.
     function encodePublic(raw as ByteArray) as ByteArray {
-        if (raw.size() == 65) {
+        var point = raw;
+        if (point.size() == 65 && point[0] == 0x04) {
+            point = point.slice(1, null);
+        }
+        if (point.size() != 64) {
             return raw;
         }
         var out = [0x04]b;
-        out.addAll(raw);
+        out.addAll(reverse(point.slice(0, 32)));
+        out.addAll(reverse(point.slice(32, 64)));
         return out;
     }
 
-    //! The inverse: strip the uncompressed-point prefix before handing a peer
-    //! key back to Connect IQ.
+    //! The inverse: remove Tesla's prefix and convert each big-endian
+    //! coordinate to the little-endian form required by Connect IQ.
     function decodePublic(encoded as ByteArray) as ByteArray {
-        if (encoded.size() == 65 && encoded[0] == 0x04) {
-            return encoded.slice(1, null);
+        var point = encoded;
+        if (point.size() == 65 && point[0] == 0x04) {
+            point = point.slice(1, null);
         }
-        return encoded;
+        if (point.size() != 64) {
+            return encoded;
+        }
+        var out = []b;
+        out.addAll(reverse(point.slice(0, 32)));
+        out.addAll(reverse(point.slice(32, 64)));
+        return out;
     }
 
     //! The shared session key: K = SHA1(BIG_ENDIAN(Sx, 32))[:16].
@@ -75,7 +88,9 @@ module CryptoUtils {
             Cryptography.KEY_PAIR_ELLIPTIC_CURVE_SECP256R1,
             decodePublic(vehiclePublicKey)
         ));
-        return sha1(agreement.generateSecret()).slice(0, 16);
+        // Garmin returns the ECDH x-coordinate in its little-endian key
+        // representation; Tesla hashes BIG_ENDIAN(Sx, 32).
+        return sha1(reverse(agreement.generateSecret())).slice(0, 16);
     }
 
     //! K' = HMAC-SHA256(K, "authenticated command"), used to sign commands.
@@ -146,6 +161,15 @@ module CryptoUtils {
     function utf8(text as String) as ByteArray {
         var out = []b;
         out.addAll(text.toUtf8Array());
+        return out;
+    }
+
+    //! Return a byte-reversed copy without changing the source array.
+    function reverse(data as ByteArray) as ByteArray {
+        var out = []b;
+        for (var i = data.size() - 1; i >= 0; i--) {
+            out.add(data[i]);
+        }
         return out;
     }
 

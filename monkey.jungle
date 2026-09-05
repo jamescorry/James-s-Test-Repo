@@ -1,1 +1,7 @@
 project.manifest = manifest.xml
+
+# Keep generated compiler output out of the source glob. The SDK default uses
+# .\**.mc, which re-ingests files under out/ on a second build and reports
+# misleading "Error occurred while reading Monkey C file" failures.
+base.sourcePath = source\**.mc
+base.resourcePath = resources

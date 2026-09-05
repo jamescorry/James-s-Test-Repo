@@ -73,6 +73,10 @@ class BleTransport extends Ble.BleDelegate {
 
     private var _listener;
     private var _targetName as String?;
+    // Optional exact address from a BLE scanner. This is useful on Garmin
+    // devices that do not expose Tesla's advertised local name, while keeping
+    // VIN-derived name matching as the default for devices with stable names.
+    private var _targetAddress as String?;
     private var _device as Ble.Device?;
     private var _scanning as Boolean = false;
 
@@ -87,6 +91,7 @@ class BleTransport extends Ble.BleDelegate {
     private var _connecting as Boolean = false;
     private var _connected as Boolean = false;
     private var _rejected as Number = 0;
+    private var _attempted as Number = 0;
 
     // Service discovery finishes some time after the connection reports
     // itself connected, so the GATT table has to be re-read rather than
@@ -170,11 +175,21 @@ class BleTransport extends Ble.BleDelegate {
         return text.equals("") ? "exception" : text;
     }
 
-    //! Start looking for the car whose VIN hashes to `localName`.
-    function startScan(localName as String) as Void {
+    //! Start looking for the car. When an address is supplied, it is an exact
+    //! filter and no nearby unnamed device will be tried as a fallback.
+    function startScan(localName as String, targetAddress as String?) as Void {
         _targetName = localName;
+        _targetAddress = null;
+        if (targetAddress != null) {
+            var address = normalizeAddress(targetAddress);
+            if (address != null) {
+                _targetAddress = address;
+            }
+        }
         _scanDesired = true;
         _rejectedResults = [];
+        _rejected = 0;
+        _attempted = 0;
         if (_scanning) {
             return;
         }
@@ -197,7 +212,7 @@ class BleTransport extends Ble.BleDelegate {
     //! Whether any candidate was connected to during this scan. Separates
     //! "never saw anything worth trying" from "tried and none was a Tesla".
     function hasTriedCandidates() as Boolean {
-        return _rejected > 0;
+        return _attempted > 0;
     }
 
     function getDiscovered() as Array {
@@ -294,6 +309,7 @@ class BleTransport extends Ble.BleDelegate {
         _connected = false;
         _identifying = false;
         _rejected = 0;
+        _attempted = 0;
         _rejectedResults = [];
         if (device != null) {
             DebugLog.add("ble close");
@@ -361,6 +377,7 @@ class BleTransport extends Ble.BleDelegate {
             if (isCandidate(result)) {
                 pauseScan();
                 _connecting = true;
+                _attempted++;
                 var adv = parseAdvertisement(result);
                 DebugLog.add("try " + result.getRssi().toString() +
                     (matches(result) ? " match" : " nameless") +
@@ -368,11 +385,21 @@ class BleTransport extends Ble.BleDelegate {
                 try {
                     _currentResult = result;
                     _device = Ble.pairDevice(result);
+                    if (_device == null) {
+                        _connecting = false;
+                        DebugLog.add("! pairDevice returned null");
+                        rememberCurrentResult();
+                        notify(:onBleRetry, null);
+                        resumeScan();
+                        return;
+                    }
                     notify(:onBleConnecting, null);
                 } catch (ex) {
                     _connecting = false;
-                    DebugLog.add("! pairDevice threw");
-                    notify(:onBleError, "Could not connect");
+                    DebugLog.add("! pairDevice threw, retry");
+                    rememberCurrentResult();
+                    notify(:onBleRetry, null);
+                    resumeScan();
                 }
                 return;
             }
@@ -409,10 +436,38 @@ class BleTransport extends Ble.BleDelegate {
                 DebugLog.add("disconnected");
                 notify(:onBleDisconnected, null);
             } else if (wasConnecting) {
+                rememberCurrentResult();
                 DebugLog.add("connect failed, rescan");
+                notify(:onBleRetry, null);
                 resumeScan();
             }
         }
+    }
+
+    //! Abort a connection attempt that exceeded the manager's overall window
+    //! and continue with another scan result. This keeps Pair from getting
+    //! stuck on one peripheral that never completes GATT connection.
+    function retryConnection() as Void {
+        if (!_connecting) {
+            return;
+        }
+        var device = _device;
+        _device = null;
+        _connecting = false;
+        _connected = false;
+        _verifyTimer.stop();
+        _identifying = false;
+        rememberCurrentResult();
+        if (device != null) {
+            try {
+                Ble.unpairDevice(device);
+            } catch (ex) {
+                // The peripheral may already have disconnected.
+            }
+        }
+        DebugLog.add("connect timeout, retry");
+        notify(:onBleRetry, null);
+        resumeScan();
     }
 
     //! Look for Tesla's VCSEC service in the connected device's GATT table.
@@ -508,10 +563,7 @@ class BleTransport extends Ble.BleDelegate {
     private function finishRejection() as Void {
         _identifying = false;
         _verifyTimer.stop();
-        if (_currentResult != null && _rejectedResults.size() < 8) {
-            _rejectedResults.add(_currentResult);
-        }
-        _currentResult = null;
+        rememberCurrentResult();
         var device = _device;
         _device = null;
         if (device != null) {
@@ -523,6 +575,15 @@ class BleTransport extends Ble.BleDelegate {
         }
         notify(:onBleWrongDevice, _rejected);
         resumeScan();
+    }
+
+    //! Remember the current scan result before dropping its connection. The
+    //! same peripheral can be reported repeatedly while the scan is running.
+    private function rememberCurrentResult() as Void {
+        if (_currentResult != null && _rejectedResults.size() < 8) {
+            _rejectedResults.add(_currentResult);
+        }
+        _currentResult = null;
     }
 
     //! What the GATT table holds, for the log. Distinguishes a device that
@@ -655,7 +716,7 @@ class BleTransport extends Ble.BleDelegate {
             :label => label,
             :rssi => rssi,
             :tesla => advertisesTesla,
-            :matches => matches(result),
+            :isMatch => matches(result),
             :manufacturer => manufacturer
         });
         notify(:onBleScanChanged, null);
@@ -671,6 +732,11 @@ class BleTransport extends Ble.BleDelegate {
     private function isCandidate(result as Ble.ScanResult) as Boolean {
         if (matches(result)) {
             return true;
+        }
+        // An exact address is an explicit debugging choice. Do not connect to
+        // an unrelated nameless peripheral when it is configured.
+        if (_targetAddress != null) {
+            return false;
         }
         if (result.getDeviceName() != null) {
             return false;
@@ -712,10 +778,6 @@ class BleTransport extends Ble.BleDelegate {
             data = result.getRawData();
         } catch (ex) {
             out.put(:hex, "raw threw");
-            return out;
-        }
-        if (!(data instanceof ByteArray)) {
-            out.put(:hex, "raw null");
             return out;
         }
         out.put(:hex, hexBytes(data, 8));
@@ -765,11 +827,44 @@ class BleTransport extends Ble.BleDelegate {
         return out;
     }
 
+    //! Settings editors differ in whether they permit punctuation in an
+    //! alphaNumeric value. Accept both the nRF Connect form
+    //! "AA:BB:CC:DD:EE:FF" and the punctuation-free "AABBCCDDEEFF" form,
+    //! then pass the colon form required by ScanResult.hasAddress().
+    private function normalizeAddress(value as String) as String? {
+        var compact = "";
+        for (var i = 0; i < value.length(); i++) {
+            var part = value.substring(i, i + 1) as String;
+            if (!part.equals(":")) {
+                compact += part;
+            }
+        }
+        if (compact.length() != 12) {
+            return null;
+        }
+        compact = compact.toUpper();
+        var formatted = "";
+        for (var offset = 0; offset < 12; offset += 2) {
+            if (offset > 0) {
+                formatted += ":";
+            }
+            formatted += compact.substring(offset, offset + 2) as String;
+        }
+        return formatted;
+    }
+
     //! Prefer an exact local-name match, which identifies one specific VIN.
     //! Connect IQ does not always populate the device name in a scan result, so
     //! fall back to any device advertising Tesla's service UUID - the wrong car
     //! would fail the personalised handshake anyway.
     private function matches(result as Ble.ScanResult) as Boolean {
+        if (_targetAddress != null) {
+            try {
+                return result.hasAddress(_targetAddress);
+            } catch (ex) {
+                return false;
+            }
+        }
         var adv = parseAdvertisement(result);
         if (adv.get(:tesla) as Boolean) {
             return true;
@@ -806,7 +901,10 @@ class BleTransport extends Ble.BleDelegate {
             return;
         }
         try {
-            descriptor.requestWrite([0x01, 0x00]b);
+            // Tesla's reference BLE connector subscribes with indications
+            // (the `ind` argument is true). Garmin exposes the same choice via
+            // the CCCD bits: 0x0002 enables indications, 0x0001 notifications.
+            descriptor.requestWrite([0x02, 0x00]b);
         } catch (ex) {
             DebugLog.add("! cccd write threw");
             notify(:onBleError, "Link setup failed");

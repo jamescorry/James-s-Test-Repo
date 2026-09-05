@@ -188,6 +188,12 @@ It greys out when no app is running, so open it with the app on screen.
    is the only step that needs a phone, and it happens once - the VIN is used
    to recognise the car's BLE advertisement and to personalise signatures. No
    network access is used at any point.
+   If the watch reports that it tried an unnamed device and could not connect,
+   enter the car's Bluetooth address in the optional **Tesla BLE address**
+   setting. Find it with nRF Connect while standing beside the car. Enter the
+   twelve hexadecimal characters, with or without the colons (for example
+   `CC45A512D33E`). This makes the scan try only that peripheral; leave it
+   empty for normal VIN-derived name matching.
 2. Open the app, press menu, and select pair.
 3. Tap the key card on the centre console. The car shows nothing until you
    do; once it reads the card it asks you to confirm the new key on screen.
@@ -215,10 +221,11 @@ Before this can go to the store:
 
 - [x] **Compile it.** Builds clean for `fenix8pro47mm` on SDK 9.2.0. Other
       devices in the manifest have not been built yet.
-- [ ] **Confirm the public key encoding.** Whether Connect IQ returns 65-byte
-      `0x04 || X || Y` or bare 64-byte `X || Y` could not be settled from
-      documentation. The code handles both, but this is the first thing to
-      check against a car.
+- [x] **Match the public key encoding.** Garmin's Cryptography documentation
+      uses bare X || Y coordinates in little-endian order; Tesla's protocol
+      requires `0x04 || BIG_ENDIAN(X) || BIG_ENDIAN(Y)`. The conversion is
+      applied in both directions, including the ECDH secret before Tesla's
+      SHA-1 step. A real-car smoke test is still required.
 - [ ] **Confirm BLE support per device.** All 14 product ids in `manifest.xml`
       are verified as real, and `fenix8pro47mm` builds - which also proves that
       device supports the BluetoothLowEnergy permission, since the compiler

@@ -82,9 +82,17 @@ New-Item -ItemType Directory -Force -Path bin | Out-Null
 if ($Package) {
     Write-Host "packaging for the store..."
     & $monkeyc -f monkey.jungle -o bin\watchkey.iq -y developer_key.der -e -r -w
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Connect IQ packaging failed (exit code $LASTEXITCODE)."
+        exit $LASTEXITCODE
+    }
     Write-Host "wrote bin\watchkey.iq"
 } else {
     Write-Host "building for $Device..."
     & $monkeyc -f monkey.jungle -o "bin\watchkey-$Device.prg" -y developer_key.der -d $Device -w
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Connect IQ build failed (exit code $LASTEXITCODE)."
+        exit $LASTEXITCODE
+    }
     Write-Host "wrote bin\watchkey-$Device.prg"
 }

@@ -3,6 +3,8 @@
 
     <string id="VinTitle">Vehicle VIN</string>
     <string id="VinPrompt">17-character VIN, found in your Tesla app under Additional Vehicle Information.</string>
+    <string id="BleAddressTitle">Tesla BLE address (optional)</string>
+    <string id="BleAddressPrompt">Optional address from nRF Connect, for example CC45A512D33E.</string>
 
     <string id="StateNoVin">Set your VIN in Garmin Connect</string>
     <string id="StateIdle">Ready</string>

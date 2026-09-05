@@ -19,7 +19,7 @@
       entry="WatchKeyApp"
       launcherIcon="@Drawables.LauncherIcon"
       minApiLevel="3.1.0"
-      version="0.5.2">
+      version="0.5.3">
     <!--
       Every product listed here must support BluetoothLowEnergy. Verify with
       "Monkey C: Edit Products" in VS Code before the first store submission -

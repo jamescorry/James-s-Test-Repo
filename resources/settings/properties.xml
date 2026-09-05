@@ -9,4 +9,10 @@
         is public. Keep it empty here and change it only locally.
     -->
     <property id="Vin" type="string"></property>
+    <!--
+        Optional exact BLE address from nRF Connect, for Garmin firmware that
+        does not expose Tesla's advertised local name. Leave empty to use the
+        VIN-derived name and the app's guarded fallback scan.
+    -->
+    <property id="BleAddress" type="string"></property>
 </properties>
