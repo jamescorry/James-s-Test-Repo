@@ -780,6 +780,10 @@ class BleTransport extends Ble.BleDelegate {
             out.put(:hex, "raw threw");
             return out;
         }
+        if (!(data instanceof ByteArray)) {
+            out.put(:hex, "raw null");
+            return out;
+        }
         out.put(:hex, hexBytes(data, 8));
 
         var i = 0;

@@ -215,6 +215,60 @@ inner = decode(decoded[1])
 check("inner fields are 2 and 3", sorted(inner), [2, 3])
 check("inner field 3 value", inner[3], 2)
 
+# --- Connect IQ key byte order ---
+#
+# Garmin's BluetoothMeshBarrel (connectiq-apps, source/Tests/TestUtil.mc)
+# records a private key and the public key bytes Toybox.Cryptography produced
+# for it. Recomputing the point on P-256 shows those bytes are big-endian
+# X || Y - the same form Tesla uses - so CryptoUtils must not reverse them.
+
+P256_P = 0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff
+P256_A = P256_P - 3
+P256_G = (
+    0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296,
+    0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5,
+)
+
+
+def p256_add(P, Q):
+    if P is None:
+        return Q
+    if Q is None:
+        return P
+    (x1, y1), (x2, y2) = P, Q
+    if x1 == x2 and (y1 + y2) % P256_P == 0:
+        return None
+    if P == Q:
+        slope = (3 * x1 * x1 + P256_A) * pow(2 * y1, P256_P - 2, P256_P) % P256_P
+    else:
+        slope = (y2 - y1) * pow(x2 - x1, P256_P - 2, P256_P) % P256_P
+    x3 = (slope * slope - x1 - x2) % P256_P
+    return (x3, (slope * (x1 - x3) - y1) % P256_P)
+
+
+def p256_mul(k, P):
+    R = None
+    while k:
+        if k & 1:
+            R = p256_add(R, P)
+        P = p256_add(P, P)
+        k >>= 1
+    return R
+
+
+GARMIN_PRIVATE = bytes.fromhex("1d415f232daf511be07c885efe1bd2ade089c0fe05ff931e4ca69ef97913bab0")
+GARMIN_PUBLIC = bytes.fromhex(
+    "31e68e389de5ad1501d1ac531af2a715f90ec86d466d697394b05079a002f2a8"
+    "15860c926436ae4f424063ef9c12c4850723b21bbd6ad74e2d53f1aa867e3abe"
+)
+
+print("\nConnect IQ public key byte order (Garmin BluetoothMeshBarrel vector)")
+gx, gy = p256_mul(int.from_bytes(GARMIN_PRIVATE, "big"), P256_G)
+check("Toybox.Cryptography emits big-endian X || Y",
+      (gx.to_bytes(32, "big") + gy.to_bytes(32, "big")).hex(), GARMIN_PUBLIC.hex())
+check("and not little-endian",
+      (gx.to_bytes(32, "little") + gy.to_bytes(32, "little")) == GARMIN_PUBLIC, False)
+
 print("\nBLE advertisement name")
 digest = hashlib.sha1(b"5YJS0000000000000").digest()[:8]
 check("local name for VIN 5YJS0000000000000", "S" + digest.hex() + "C", "S1a87a5a75f3df858C")

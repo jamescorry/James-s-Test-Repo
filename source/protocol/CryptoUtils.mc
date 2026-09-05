@@ -38,37 +38,32 @@ module CryptoUtils {
     }
 
     //! Tesla encodes public keys as 0x04 || BIG_ENDIAN(X) || BIG_ENDIAN(Y).
-    //! Garmin's Cryptography API uses bare X || Y values in little-endian
-    //! byte order (the API's ECDH example calls this out explicitly), so both
-    //! coordinates must be reversed at this boundary.
+    //! Connect IQ's Cryptography API emits the same big-endian X || Y without
+    //! the prefix, so the only change at this boundary is the 0x04 byte.
+    //!
+    //! No byte reversal. A test vector in Garmin's own BluetoothMeshBarrel
+    //! (TestUtil.mc) gives a private key and the public key bytes the API
+    //! produced for it; recomputing that point on P-256 matches Garmin's
+    //! bytes only when read big-endian, and the barrel puts those bytes on
+    //! the wire unchanged where the Mesh spec requires big-endian. Reversing
+    //! them here would make the car reject the key as an invalid point.
+    //! tools/verify_vectors.py pins this.
     function encodePublic(raw as ByteArray) as ByteArray {
-        var point = raw;
-        if (point.size() == 65 && point[0] == 0x04) {
-            point = point.slice(1, null);
-        }
-        if (point.size() != 64) {
+        if (raw.size() == 65) {
             return raw;
         }
         var out = [0x04]b;
-        out.addAll(reverse(point.slice(0, 32)));
-        out.addAll(reverse(point.slice(32, 64)));
+        out.addAll(raw);
         return out;
     }
 
-    //! The inverse: remove Tesla's prefix and convert each big-endian
-    //! coordinate to the little-endian form required by Connect IQ.
+    //! The inverse: strip the uncompressed-point prefix before handing a peer
+    //! key back to Connect IQ.
     function decodePublic(encoded as ByteArray) as ByteArray {
-        var point = encoded;
-        if (point.size() == 65 && point[0] == 0x04) {
-            point = point.slice(1, null);
+        if (encoded.size() == 65 && encoded[0] == 0x04) {
+            return encoded.slice(1, null);
         }
-        if (point.size() != 64) {
-            return encoded;
-        }
-        var out = []b;
-        out.addAll(reverse(point.slice(0, 32)));
-        out.addAll(reverse(point.slice(32, 64)));
-        return out;
+        return encoded;
     }
 
     //! The shared session key: K = SHA1(BIG_ENDIAN(Sx, 32))[:16].
@@ -88,9 +83,10 @@ module CryptoUtils {
             Cryptography.KEY_PAIR_ELLIPTIC_CURVE_SECP256R1,
             decodePublic(vehiclePublicKey)
         ));
-        // Garmin returns the ECDH x-coordinate in its little-endian key
-        // representation; Tesla hashes BIG_ENDIAN(Sx, 32).
-        return sha1(reverse(agreement.generateSecret())).slice(0, 16);
+        // generateSecret yields the shared x-coordinate big-endian, which is
+        // the form Tesla hashes; Garmin's mesh barrel feeds the same bytes
+        // unchanged into a spec-defined big-endian derivation.
+        return sha1(agreement.generateSecret()).slice(0, 16);
     }
 
     //! K' = HMAC-SHA256(K, "authenticated command"), used to sign commands.
@@ -161,15 +157,6 @@ module CryptoUtils {
     function utf8(text as String) as ByteArray {
         var out = []b;
         out.addAll(text.toUtf8Array());
-        return out;
-    }
-
-    //! Return a byte-reversed copy without changing the source array.
-    function reverse(data as ByteArray) as ByteArray {
-        var out = []b;
-        for (var i = data.size() - 1; i >= 0; i--) {
-            out.add(data[i]);
-        }
         return out;
     }
 
