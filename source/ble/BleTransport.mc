@@ -145,33 +145,17 @@ class BleTransport extends Ble.BleDelegate {
             DebugLog.add("! tesla profile: " + describe(ex));
         }
 
-        // Generic Access is a system service and Connect IQ may refuse to
-        // register a profile for it. Registering it threw on a Fenix 8 Pro
-        // and took the app down, so it is optional: without it, rejected
-        // devices simply go unnamed in the log.
-        try {
-            Ble.registerProfile({
-                :uuid => _gapService,
-                :characteristics => [
-                    {
-                        :uuid => _gapDeviceName
-                    }
-                ]
-            });
-            _gapRegistered = true;
-        } catch (ex) {
-            DebugLog.add("gap profile refused: " + describe(ex));
-        }
+        // Generic Access is not registered. It is a system service, and
+        // registering a profile for it took the app down on a Fenix 8 Pro
+        // about a second after launch - not as a catchable exception, but
+        // as a termination after the asynchronous registration result. A
+        // single profile, as here, ran without trouble. The read path below
+        // stays in place behind _gapRegistered in case a later SDK allows it.
+        _gapRegistered = false;
     }
 
     function onProfileRegister(uuid as Ble.Uuid, status as Ble.Status) as Void {
-        try {
-            var which = uuid.equals(_service) ? "tesla" : (uuid.equals(_gapService) ? "gap" : "other");
-            DebugLog.add("profile " + which +
-                (status == Ble.STATUS_SUCCESS ? " ok" : " ! status " + status.toString()));
-        } catch (ex) {
-            DebugLog.add("profile cb: " + describe(ex));
-        }
+        DebugLog.add("profile " + (status == Ble.STATUS_SUCCESS ? "ok" : "status " + status.toString()));
     }
 
     //! Class and message of an exception, for the log.
