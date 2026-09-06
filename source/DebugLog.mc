@@ -9,7 +9,7 @@ import Toybox.WatchUi;
 //! timestamp, so a failed attempt can be read back line by line instead of
 //! being summarised as "no response".
 module DebugLog {
-    const CAPACITY = 40;
+    const CAPACITY = 80;
 
     var _lines as Array<String> = [];
     var _start as Number = -1;

@@ -378,10 +378,9 @@ class BleTransport extends Ble.BleDelegate {
                 pauseScan();
                 _connecting = true;
                 _attempted++;
-                var adv = parseAdvertisement(result);
                 DebugLog.add("try " + result.getRssi().toString() +
-                    (matches(result) ? " match" : " nameless") +
-                    " adv " + (adv.get(:hex) as String));
+                    (matches(result) ? " match" : " nameless"));
+                logAdvertisement(result);
                 try {
                     _currentResult = result;
                     _device = Ble.pairDevice(result);
@@ -719,7 +718,43 @@ class BleTransport extends Ble.BleDelegate {
             :isMatch => matches(result),
             :manufacturer => manufacturer
         });
+        // The whole advertisement of each new device goes to the log, where
+        // it can be read back and decoded. The screen row only has room for
+        // the first few bytes.
+        if (_discovered.size() <= 8) {
+            DebugLog.add("d" + _discovered.size().toString() + " " + rssi.toString() + " " + label);
+            logAdvertisement(result);
+        }
         notify(:onBleScanChanged, null);
+    }
+
+    //! The raw advertisement bytes, split across log lines short enough to
+    //! fit the screen: eleven bytes per line, so a full 31-byte payload
+    //! takes three.
+    private function logAdvertisement(result as Ble.ScanResult) as Void {
+        if (!(result has :getRawData)) {
+            DebugLog.add("  adv n/a");
+            return;
+        }
+        var data = null;
+        try {
+            data = result.getRawData();
+        } catch (ex) {
+            DebugLog.add("  adv threw");
+            return;
+        }
+        if (!(data instanceof ByteArray)) {
+            DebugLog.add("  adv null");
+            return;
+        }
+        if (data.size() == 0) {
+            DebugLog.add("  adv empty");
+            return;
+        }
+        for (var offset = 0; offset < data.size(); offset += 11) {
+            var end = offset + 11 < data.size() ? offset + 11 : data.size();
+            DebugLog.add("  " + hexBytes(data.slice(offset, end), 11));
+        }
     }
 
     //! Worth connecting to and inspecting.
