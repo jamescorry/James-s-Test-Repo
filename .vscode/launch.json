@@ -1,0 +1,22 @@
+{
+    // Press F5 (Run > Start Debugging) to build and launch in the simulator.
+    // The Monkey C extension has no "Run App" command in the palette - running
+    // is a debug configuration, which is why only "Run Tests" shows up there.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "monkeyc",
+            "request": "launch",
+            "name": "Run on Fenix 8 Pro",
+            "stopAtLaunch": false,
+            "device": "fenix8pro47mm"
+        },
+        {
+            "type": "monkeyc",
+            "request": "launch",
+            "name": "Run (pick a device)",
+            "stopAtLaunch": false,
+            "device": "${command:GetTargetDevice}"
+        }
+    ]
+}

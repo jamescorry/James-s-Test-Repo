@@ -1,0 +1,18 @@
+Watch Key includes work from the following projects.
+
+kaedenbrinkman/Garmin-TeslaKey - MIT License
+https://github.com/kaedenbrinkman/Garmin-TeslaKey
+The structure of source/ble/BleTransport.mc follows the BLE delegate from that
+project: the GATT profile registration, scan/pair flow and characteristic
+notification setup.
+
+teslamotors/vehicle-command - Apache License 2.0
+https://github.com/teslamotors/vehicle-command
+Protocol field numbers, message shapes and the test vectors in
+tools/verify_vectors.py are taken from Tesla's published protocol
+specification and .proto definitions.
+
+Apache License 2.0 grants no trademark rights. "Tesla", "Model 3", "Model Y",
+"Model S", "Model X" and "Cybertruck" are trademarks of Tesla, Inc. This
+project is not affiliated with, endorsed by, or supported by Tesla, Inc. or
+Garmin Ltd.

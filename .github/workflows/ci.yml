@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  # Runs everywhere, with no account and no SDK.
+  checks:
+    name: Syntax and protocol vectors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install parser
+        run: npm install --no-audit --no-fund
+
+      - name: Check Monkey C syntax
+        run: npm run check
+
+      - name: Verify protocol logic against Tesla's test vectors
+        run: python3 tools/verify_vectors.py
+
+  # The Connect IQ SDK is a plain download, but the device files it compiles
+  # against come from Garmin's authenticated API. This job therefore needs a
+  # Garmin account, and is skipped when the secrets are not configured.
+  # See README for how to set it up.
+  guard:
+    name: Check for Garmin credentials
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        env:
+          GARMIN_USERNAME: ${{ secrets.GARMIN_USERNAME }}
+        run: |
+          if [[ -n "$GARMIN_USERNAME" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Garmin credentials not configured - skipping the compile job."
+          fi
+
+  build:
+    name: Compile with the Connect IQ SDK
+    needs: guard
+    if: needs.guard.outputs.configured == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install connect-iq-sdk-manager
+        run: |
+          curl -sSf https://raw.githubusercontent.com/lindell/connect-iq-sdk-manager-cli/master/install.sh | sh
+          echo "$PWD/bin" >> "$GITHUB_PATH"
+
+      - name: Accept the SDK agreement and log in
+        env:
+          GARMIN_USERNAME: ${{ secrets.GARMIN_USERNAME }}
+          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+          AGREEMENT_HASH: ${{ secrets.GARMIN_AGREEMENT_HASH }}
+        run: |
+          connect-iq-sdk-manager agreement accept --acceptance-hash="$AGREEMENT_HASH"
+          connect-iq-sdk-manager login
+
+      - name: Install the SDK and the devices this app targets
+        run: |
+          connect-iq-sdk-manager sdk set "${{ vars.CONNECT_IQ_SDK_VERSION || 'latest' }}"
+          echo "$(connect-iq-sdk-manager sdk current-path --bin)" >> "$GITHUB_PATH"
+          connect-iq-sdk-manager device download --manifest=manifest.xml
+
+      - name: Build
+        run: scripts/build.sh "${{ vars.CONNECT_IQ_DEVICE || 'fenix7' }}"
+
+      - name: Package for the store
+        run: scripts/build.sh --package
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: watch-key
+          path: bin/
